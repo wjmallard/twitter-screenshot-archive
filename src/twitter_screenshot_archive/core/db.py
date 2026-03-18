@@ -1,9 +1,21 @@
+import sys
+
 import psycopg
 from contextlib import contextmanager
 
 from . import config
 
 DB_NAME = "twitter_screenshot_archive"
+
+
+def check_db():
+    """Verify PostgreSQL is reachable. Call once at startup."""
+    try:
+        psycopg.connect(dbname=DB_NAME).close()
+    except psycopg.OperationalError as exc:
+        print(f"Error: Could not connect to PostgreSQL: {exc}", file=sys.stderr)
+        print("Is the server running? Try: brew services start postgresql@17", file=sys.stderr)
+        sys.exit(1)
 
 
 @contextmanager

@@ -152,12 +152,7 @@ def _init_lsh():
 
 @asynccontextmanager
 async def _lifespan(server: FastMCP):
-    try:
-        _init_lsh()
-    except Exception as exc:
-        print(f"Error: Could not connect to PostgreSQL: {exc}", file=sys.stderr)
-        print("Is the server running? Try: brew services start postgresql@17", file=sys.stderr)
-        sys.exit(1)
+    _init_lsh()
     load_model()
     print("MCP server ready. Press Ctrl+D to exit.", file=sys.stderr)
     yield {}
@@ -171,6 +166,9 @@ mcp = FastMCP(
 
 
 def main():
+    from ..core.db import check_db
+    check_db()
+
     # Import tool modules to trigger @mcp.tool() registration
     from . import activity, drill, explore, orient, search  # noqa: F401
 

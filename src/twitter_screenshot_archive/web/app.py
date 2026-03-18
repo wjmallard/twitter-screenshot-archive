@@ -237,6 +237,8 @@ def timeline(screenshot_id):
 
 
 def main():
+    from ..core.db import check_db
+    check_db()
     # When Flask's debug reloader is active, the parent process only monitors
     # files and never serves requests. Skip the expensive index build there.
     # WERKZEUG_RUN_MAIN is set to 'true' only in the child (serving) process.

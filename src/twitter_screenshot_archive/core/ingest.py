@@ -166,6 +166,8 @@ def ingest(root: Path, workers: int = config.TESSERACT_WORKERS):
 
 
 def main():
+    from .db import check_db
+    check_db()
     ingest(config.SCREENSHOT_DIR)
 
 
