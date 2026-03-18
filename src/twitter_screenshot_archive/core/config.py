@@ -4,7 +4,19 @@ from pathlib import Path
 
 import yaml
 
-_CONFIG_PATH = Path("config.yaml")
+
+def _find_project_root():
+    d = Path(__file__).resolve().parent
+    while d != d.parent:
+        if (d / "pyproject.toml").exists():
+            return d
+        d = d.parent
+    raise FileNotFoundError("Could not find project root (no pyproject.toml)")
+
+
+_PROJECT_ROOT = _find_project_root()
+
+_CONFIG_PATH = _PROJECT_ROOT / "config.yaml"
 
 with open(_CONFIG_PATH) as f:
     _raw = yaml.safe_load(f)

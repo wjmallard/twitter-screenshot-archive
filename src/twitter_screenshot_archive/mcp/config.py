@@ -1,10 +1,10 @@
 """MCP-specific configuration from config.yaml."""
 
-from pathlib import Path
+from twitter_screenshot_archive.core.config import _PROJECT_ROOT
 
 import yaml
 
-_CONFIG_PATH = Path("config.yaml")
+_CONFIG_PATH = _PROJECT_ROOT / "config.yaml"
 
 try:
     with open(_CONFIG_PATH) as f:
