@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "opencv-python-headless>=4.13.0.92",
+    "orjson>=3.10",
     "pillow>=12.1.1",
     "pillow-heif>=1.3.0",
     "datasketch>=1.6.5",
@@ -25,6 +26,7 @@ tsa-web = "twitter_screenshot_archive.web:main"
 tsa-mcp = "twitter_screenshot_archive.mcp:main"
 tsa-embed = "twitter_screenshot_archive.mcp.embed:main"
 tsa-describe = "twitter_screenshot_archive.mcp.describe:main"
+tsa-import = "twitter_screenshot_archive.core.twitter_import:main"
 
 [build-system]
 requires = ["hatchling"]

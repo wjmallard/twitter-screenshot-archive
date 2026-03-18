@@ -34,3 +34,25 @@ CREATE INDEX idx_screenshots_created_local ON screenshots (created_at_local);
 CREATE INDEX idx_screenshots_mentioned_users ON screenshots USING GIN (mentioned_users);
 CREATE INDEX idx_screenshots_tweet_time ON screenshots (tweet_time);
 CREATE INDEX idx_screenshots_embedding ON screenshots USING hnsw (embedding vector_cosine_ops);
+
+CREATE TABLE twitter_likes (
+    tweet_id BIGINT PRIMARY KEY,
+    full_text TEXT,
+    expanded_url TEXT,
+    account TEXT NOT NULL,
+    imported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE twitter_tweets (
+    tweet_id BIGINT PRIMARY KEY,
+    full_text TEXT,
+    created_at TIMESTAMPTZ,
+    in_reply_to_tweet_id BIGINT,
+    in_reply_to_user_id BIGINT,
+    in_reply_to_screen_name TEXT,
+    retweet_count INT,
+    favorite_count INT,
+    lang TEXT,
+    account TEXT NOT NULL,
+    imported_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
