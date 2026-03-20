@@ -40,6 +40,7 @@ CREATE TABLE twitter_likes (
     full_text TEXT,
     expanded_url TEXT,
     account TEXT NOT NULL,
+    snowflake_date TIMESTAMPTZ,
     imported_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

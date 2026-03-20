@@ -2,12 +2,21 @@
 
 import argparse
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+
+# Twitter snowflake epoch: 2010-11-04T01:42:54.657Z
+_SNOWFLAKE_EPOCH_MS = 1288834974657
 
 import orjson
 
 from .db import check_db, get_conn
+
+
+def _snowflake_to_datetime(snowflake_id):
+    """Extract UTC timestamp from a Twitter snowflake ID."""
+    ms = (snowflake_id >> 22) + _SNOWFLAKE_EPOCH_MS
+    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
 
 
 def _parse_export_js(path):
@@ -36,23 +45,27 @@ def _import_likes(conn, export_dir, account):
                 tweet_id,
                 full_text,
                 expanded_url,
-                account
+                account,
+                snowflake_date
             ) VALUES (
                 %(tweet_id)s,
                 %(full_text)s,
                 %(expanded_url)s,
-                %(account)s
+                %(account)s,
+                %(snowflake_date)s
             )
             ON CONFLICT (tweet_id) DO UPDATE SET
                 full_text = EXCLUDED.full_text,
                 expanded_url = EXCLUDED.expanded_url,
-                account = EXCLUDED.account
+                account = EXCLUDED.account,
+                snowflake_date = EXCLUDED.snowflake_date
             """,
             {
                 "tweet_id": int(like["tweetId"]),
                 "full_text": like.get("fullText"),
                 "expanded_url": like.get("expandedUrl"),
                 "account": account,
+                "snowflake_date": _snowflake_to_datetime(int(like["tweetId"])),
             },
         )
         count += 1
