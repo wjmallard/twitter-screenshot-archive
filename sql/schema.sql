@@ -56,3 +56,11 @@ CREATE TABLE twitter_tweets (
     account TEXT NOT NULL,
     imported_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE screenshot_tweet_matches (
+    screenshot_id BIGINT NOT NULL REFERENCES screenshots(id),
+    tweet_id BIGINT NOT NULL,
+    score REAL NOT NULL,
+    matched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (screenshot_id, tweet_id)
+);
