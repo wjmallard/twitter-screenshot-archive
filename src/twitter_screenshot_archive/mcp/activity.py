@@ -5,7 +5,12 @@ from .config import SEARCH_SIMILARITY_FLOOR
 from .embedding import embed_texts, vec_literal
 from .server import mcp
 
-_VALID_GRANULARITIES = {"day", "week", "month", "year"}
+_GRANULARITY_LABELS = {
+    "day": "daily",
+    "month": "monthly",
+    "week": "weekly",
+    "year": "yearly",
+}
 
 
 @mcp.tool()
@@ -34,8 +39,8 @@ async def tweet_activity(
         include_mean: When query is provided, also show mean similarity per
                       bucket alongside the always-on max (default false).
     """
-    if granularity not in _VALID_GRANULARITIES:
-        return f"Error: granularity must be one of: {', '.join(sorted(_VALID_GRANULARITIES))}"
+    if granularity not in _GRANULARITY_LABELS:
+        return f"Error: granularity must be one of: {', '.join(sorted(_GRANULARITY_LABELS))}"
 
     conditions = ["ocr_text_clean IS NOT NULL"]
     params: dict = {}
@@ -117,7 +122,7 @@ async def tweet_activity(
         header_parts.append(f"matching {query!r}")
     if users:
         header_parts.append(f"by {', '.join('@' + u for u in users)}")
-    header_parts.append(f"({granularity}ly)")
+    header_parts.append(f"({_GRANULARITY_LABELS[granularity]})")
     lines.append(" ".join(header_parts))
     lines.append("")
 
