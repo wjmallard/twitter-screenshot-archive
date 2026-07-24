@@ -21,6 +21,8 @@ app = Flask(__name__)
 
 PER_PAGE = config.RESULTS_PER_PAGE
 
+_IMAGE_ROOT = config.SCREENSHOT_DIR.resolve()
+
 _lsh = None
 _minhashes = {}
 
@@ -150,11 +152,11 @@ def serve_image():
     path = request.args.get("path", "")
     if not path:
         abort(400)
-    p = Path(path)
+    p = Path(path).resolve()
+    if not p.is_relative_to(_IMAGE_ROOT):
+        abort(403)
     if not p.is_file():
         abort(404)
-    if ".." in p.parts:
-        abort(403)
 
     if request.args.get("thumb"):
         from PIL import Image
