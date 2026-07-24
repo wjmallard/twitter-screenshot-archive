@@ -138,23 +138,7 @@ def ingest(root: Path, workers: int = config.TESSERACT_WORKERS):
             for future in tqdm(as_completed(futures), total=len(to_process), unit="img"):
                 path = futures[future]
                 try:
-                    result = future.result()
-                    upsert_screenshot(
-                        conn,
-                        result["file_path"],
-                        result["ocr_text"],
-                        result["created_at"],
-                        result["created_at_local"],
-                        result["timezone"],
-                        result["width"],
-                        result["height"],
-                        result["file_size"],
-                        result["minhash_signature"],
-                        result["mentioned_users"],
-                        result["tweet_time"],
-                        result["tweet_time_source"],
-                        result["ocr_text_clean"],
-                    )
+                    upsert_screenshot(conn, future.result())
                     done += 1
                     if done % config.COMMIT_BATCH_SIZE == 0:
                         conn.commit()

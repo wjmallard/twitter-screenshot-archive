@@ -31,15 +31,39 @@ def get_conn():
         conn.close()
 
 
-def upsert_screenshot(conn, file_path, ocr_text, created_at, created_at_local, timezone, width, height,
-                      file_size=None, minhash_signature=None, mentioned_users=None,
-                      tweet_time=None, tweet_time_source=None, ocr_text_clean=None):
+def upsert_screenshot(conn, row):
+    """Insert or update one screenshot. Expects the dict built by process_image()."""
     conn.execute(
         """
-        INSERT INTO screenshots (file_path, ocr_text, ocr_text_clean, created_at, created_at_local, timezone,
-                                 width, height, file_size, minhash_signature, mentioned_users,
-                                 tweet_time, tweet_time_source)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO screenshots (
+            file_path,
+            ocr_text,
+            ocr_text_clean,
+            created_at,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size,
+            minhash_signature,
+            mentioned_users,
+            tweet_time,
+            tweet_time_source
+        ) VALUES (
+            %(file_path)s,
+            %(ocr_text)s,
+            %(ocr_text_clean)s,
+            %(created_at)s,
+            %(created_at_local)s,
+            %(timezone)s,
+            %(width)s,
+            %(height)s,
+            %(file_size)s,
+            %(minhash_signature)s,
+            %(mentioned_users)s,
+            %(tweet_time)s,
+            %(tweet_time_source)s
+        )
         ON CONFLICT (file_path) DO UPDATE SET
             ocr_text = EXCLUDED.ocr_text,
             ocr_text_clean = EXCLUDED.ocr_text_clean,
@@ -54,8 +78,7 @@ def upsert_screenshot(conn, file_path, ocr_text, created_at, created_at_local, t
             tweet_time = EXCLUDED.tweet_time,
             tweet_time_source = EXCLUDED.tweet_time_source
         """,
-        (file_path, ocr_text, ocr_text_clean, created_at, created_at_local, timezone, width, height,
-         file_size, minhash_signature, mentioned_users, tweet_time, tweet_time_source),
+        row,
     )
 
 
@@ -67,8 +90,8 @@ def images_in_db(conn) -> set[str]:
 _HALF_LIFE_SECS = config.DECAY_HALF_LIFE_DAYS * 86400
 _DECAY = f"(1.0 / (EXTRACT(EPOCH FROM now() - COALESCE(created_at, now())) / {_HALF_LIFE_SECS} + 1))"
 
-_FT_SCORE = "ts_rank(ocr_text_tsv, websearch_to_tsquery('english', %s))"
-_TG_SCORE = "word_similarity(%s, ocr_text)"
+_FT_SCORE = "ts_rank(ocr_text_tsv, websearch_to_tsquery('english', %(query)s))"
+_TG_SCORE = "word_similarity(%(query)s, ocr_text)"
 
 SORT_OPTIONS = {
     "best": {"word": f"{_FT_SCORE} * {_DECAY} DESC", "char": f"{_TG_SCORE} * {_DECAY} DESC", "none": f"{_DECAY} DESC"},
@@ -77,94 +100,136 @@ SORT_OPTIONS = {
     "oldest": "created_at ASC NULLS LAST",
 }
 
-# Number of extra %s params the ORDER BY clause needs for the query string
-_SORT_EXTRA_PARAMS = {
-    "best": {"word": 1, "char": 1, "none": 0},
-    "strongest": {"word": 1, "char": 1, "none": 0},
-    "newest": 0,
-    "oldest": 0,
-}
-
 
 def _resolve_sort(sort, fuzzy):
     if sort not in SORT_OPTIONS:
         sort = "best"
     opt = SORT_OPTIONS[sort]
-    order = opt[fuzzy] if isinstance(opt, dict) else opt
-    extra_opt = _SORT_EXTRA_PARAMS[sort]
-    extra = extra_opt[fuzzy] if isinstance(extra_opt, dict) else extra_opt
-    return order, extra
+    return opt[fuzzy] if isinstance(opt, dict) else opt
 
 
 def search_fulltext(conn, query, limit=50, offset=0, sort="best"):
-    order, extra = _resolve_sort(sort, "word")
-    params = (query, query) + (query,) * extra + (limit, offset)
+    order = _resolve_sort(sort, "word")
     return conn.execute(
         f"""
-        SELECT id, file_path, ocr_text, created_at_local, timezone, width, height, file_size,
-               ts_rank(ocr_text_tsv, websearch_to_tsquery('english', %s)) AS score
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size,
+            ts_rank(ocr_text_tsv, websearch_to_tsquery('english', %(query)s)) AS score
         FROM screenshots
-        WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %s)
+        WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %(query)s)
         ORDER BY {order}
-        LIMIT %s OFFSET %s
+        LIMIT %(limit)s
+        OFFSET %(offset)s
         """,
-        params,
+        {
+            "query": query,
+            "limit": limit,
+            "offset": offset,
+        },
     ).fetchall()
 
 
 def search_trigram(conn, query, limit=50, offset=0, sort="best"):
-    order, extra = _resolve_sort(sort, "char")
-    params = (query, query) + (query,) * extra + (limit, offset)
+    order = _resolve_sort(sort, "char")
     return conn.execute(
         f"""
-        SELECT id, file_path, ocr_text, created_at_local, timezone, width, height, file_size,
-               word_similarity(%s, ocr_text) AS score
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size,
+            word_similarity(%(query)s, ocr_text) AS score
         FROM screenshots
-        WHERE %s <<%% ocr_text
+        WHERE %(query)s <<%% ocr_text
         ORDER BY {order}
-        LIMIT %s OFFSET %s
+        LIMIT %(limit)s
+        OFFSET %(offset)s
         """,
-        params,
+        {
+            "query": query,
+            "limit": limit,
+            "offset": offset,
+        },
     ).fetchall()
 
 
 def search_exact(conn, query, limit=50, offset=0, sort="best"):
-    order, extra = _resolve_sort(sort, "none")
-    like_param = f"%{query}%"
-    params = (like_param,) + (query,) * extra + (limit, offset)
+    order = _resolve_sort(sort, "none")
     return conn.execute(
         f"""
-        SELECT id, file_path, ocr_text, created_at_local, timezone, width, height, file_size,
-               1.0 AS score
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size,
+            1.0 AS score
         FROM screenshots
-        WHERE ocr_text ILIKE %s
+        WHERE ocr_text ILIKE %(pattern)s
         ORDER BY {order}
-        LIMIT %s OFFSET %s
+        LIMIT %(limit)s
+        OFFSET %(offset)s
         """,
-        params,
+        {
+            "pattern": f"%{query}%",
+            "limit": limit,
+            "offset": offset,
+        },
     ).fetchall()
 
 
 def count_fulltext(conn, query):
     row = conn.execute(
-        "SELECT count(*) FROM screenshots WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %s)",
-        (query,),
+        """
+        SELECT count(*)
+        FROM screenshots
+        WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %(query)s)
+        """,
+        {
+            "query": query,
+        },
     ).fetchone()
     return row[0]
 
 
 def count_trigram(conn, query):
     row = conn.execute(
-        "SELECT count(*) FROM screenshots WHERE %s <<%% ocr_text",
-        (query,),
+        """
+        SELECT count(*)
+        FROM screenshots
+        WHERE %(query)s <<%% ocr_text
+        """,
+        {
+            "query": query,
+        },
     ).fetchone()
     return row[0]
 
 
 def count_exact(conn, query):
     row = conn.execute(
-        "SELECT count(*) FROM screenshots WHERE ocr_text ILIKE %s",
-        (f"%{query}%",),
+        """
+        SELECT count(*)
+        FROM screenshots
+        WHERE ocr_text ILIKE %(pattern)s
+        """,
+        {
+            "pattern": f"%{query}%",
+        },
     ).fetchone()
     return row[0]
 
@@ -197,10 +262,22 @@ def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
     """
     focal = conn.execute(
         """
-        SELECT id, file_path, ocr_text, created_at_local, timezone, width, height, file_size, created_at
-        FROM screenshots WHERE id = %s
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size,
+            created_at
+        FROM screenshots
+        WHERE id = %(id)s
         """,
-        (screenshot_id,),
+        {
+            "id": screenshot_id,
+        },
     ).fetchone()
     if not focal:
         return [], None, []
@@ -211,24 +288,50 @@ def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
 
     before_rows = conn.execute(
         """
-        SELECT id, file_path, ocr_text, created_at_local, timezone, width, height, file_size
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size
         FROM screenshots
-        WHERE (created_at, id) < (%s, %s) AND created_at IS NOT NULL
+        WHERE (created_at, id) < (%(ts)s, %(id)s)
+          AND created_at IS NOT NULL
         ORDER BY created_at DESC, id DESC
-        LIMIT %s
+        LIMIT %(limit)s
         """,
-        (focal_time, screenshot_id, before),
+        {
+            "ts": focal_time,
+            "id": screenshot_id,
+            "limit": before,
+        },
     ).fetchall()
 
     after_rows = conn.execute(
         """
-        SELECT id, file_path, ocr_text, created_at_local, timezone, width, height, file_size
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size
         FROM screenshots
-        WHERE (created_at, id) > (%s, %s) AND created_at IS NOT NULL
+        WHERE (created_at, id) > (%(ts)s, %(id)s)
+          AND created_at IS NOT NULL
         ORDER BY created_at ASC, id ASC
-        LIMIT %s
+        LIMIT %(limit)s
         """,
-        (focal_time, screenshot_id, after),
+        {
+            "ts": focal_time,
+            "id": screenshot_id,
+            "limit": after,
+        },
     ).fetchall()
 
     return list(reversed(before_rows)), focal[:8], list(after_rows)
@@ -240,11 +343,21 @@ def get_screenshots_by_ids(conn, ids):
         return {}
     rows = conn.execute(
         """
-        SELECT id, file_path, ocr_text, created_at_local, timezone, width, height, file_size
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size
         FROM screenshots
-        WHERE id = ANY(%s)
+        WHERE id = ANY(%(ids)s)
         """,
-        (list(ids),),
+        {
+            "ids": list(ids),
+        },
     ).fetchall()
     return {
         row[0]: {
