@@ -40,16 +40,16 @@ LSH_THRESHOLD = 0.2
 
 
 def build_lsh_index(rows):
-    """Build LSH index from (id, signature_bytes) pairs.
+    """Build LSH index from screenshot rows with minhash signatures.
 
     Returns (lsh_index, {id: MinHash} dict).
     """
     lsh = MinHashLSH(threshold=LSH_THRESHOLD, num_perm=NUM_PERM)
     minhashes = {}
-    for row_id, sig_bytes in rows:
-        m = signature_to_minhash(sig_bytes)
-        minhashes[row_id] = m
-        lsh.insert(str(row_id), m)
+    for row in rows:
+        m = signature_to_minhash(row["minhash_signature"])
+        minhashes[row["id"]] = m
+        lsh.insert(str(row["id"]), m)
     return lsh, minhashes
 
 

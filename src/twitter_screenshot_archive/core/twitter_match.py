@@ -49,11 +49,11 @@ def _build_index(conn):
 
     index = defaultdict(set)
     ocr_map = {}
-    for sid, ocr in rows:
-        nocr = _norm(ocr)
-        ocr_map[sid] = nocr
+    for row in rows:
+        nocr = _norm(row["ocr_text_clean"])
+        ocr_map[row["id"]] = nocr
         for ng in _word_ngrams(nocr):
-            index[ng].add(sid)
+            index[ng].add(row["id"])
 
     print(f"Built index: {len(index):,} unique 3-grams", file=sys.stderr)
     return index, ocr_map
@@ -81,8 +81,9 @@ def _match_source(conn, index, ocr_map, source_table, source_label):
     matched_tweets = 0
     total_links = 0
     progress = tqdm(rows, desc=source_label, file=sys.stderr)
-    for tweet_id, full_text in progress:
-        needle = _norm(_clean_tweet_text(full_text))
+    for tweet in progress:
+        tweet_id = tweet["tweet_id"]
+        needle = _norm(_clean_tweet_text(tweet["full_text"]))
         ngrams = _word_ngrams(needle)
         if not ngrams:
             continue

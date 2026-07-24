@@ -26,18 +26,18 @@ async def archive_range() -> str:
         row = conn.execute(
             """
             SELECT
-                MIN(created_at),
-                MAX(created_at)
+                min(created_at) AS first,
+                max(created_at) AS last
             FROM screenshots
             """
         ).fetchone()
 
-    if not row or not row[0]:
+    if not row or not row["first"]:
         return "Archive is empty."
 
     return (
-        f"First: {row[0].isoformat()}\n"
-        f"Last: {row[1].isoformat()}"
+        f"First: {row['first'].isoformat()}\n"
+        f"Last: {row['last'].isoformat()}"
     )
 
 
@@ -71,4 +71,4 @@ async def count_screenshots(
             params,
         ).fetchone()
 
-    return str(row[0])
+    return str(row["count"])

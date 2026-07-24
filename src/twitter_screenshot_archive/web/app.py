@@ -120,19 +120,7 @@ def index():
             else:
                 rows = search_fulltext(conn, q, limit=PER_PAGE, offset=offset, sort=sort)
                 total_results = count_fulltext(conn, q)
-            for row_id, file_path, ocr_text, created_at_local, tz, width, height, file_size, score in rows:
-                results.append({
-                    "id": row_id,
-                    "file_path": file_path,
-                    "name": Path(file_path).name,
-                    "ocr_text": ocr_text or "",
-                    "date": created_at_local.strftime("%Y-%m-%d · %I:%M %p · %A") if created_at_local else "unknown",
-                    "timezone": tz or "",
-                    "width": width,
-                    "height": height,
-                    "file_size": _format_size(file_size),
-                    "score": score,
-                })
+            results.extend(_format_screenshot(row) for row in rows)
 
     total_pages = (total_results + PER_PAGE - 1) // PER_PAGE if total_results else 0
 
@@ -180,18 +168,22 @@ def serve_image():
     return send_file(p, mimetype=mime)
 
 
-def _format_screenshot(s, screenshot_id):
-    return {
-        "id": screenshot_id,
-        "file_path": s["file_path"],
-        "name": Path(s["file_path"]).name,
-        "ocr_text": s["ocr_text"] or "",
-        "date": s["created_at_local"].strftime("%Y-%m-%d · %I:%M %p · %A") if s["created_at_local"] else "unknown",
-        "timezone": s["timezone"] or "",
-        "width": s["width"],
-        "height": s["height"],
-        "file_size": _format_size(s["file_size"]),
+def _format_screenshot(row):
+    """Shape a screenshots row for templates and JSON responses."""
+    formatted = {
+        "id": row["id"],
+        "file_path": row["file_path"],
+        "name": Path(row["file_path"]).name,
+        "ocr_text": row["ocr_text"] or "",
+        "date": row["created_at_local"].strftime("%Y-%m-%d · %I:%M %p · %A") if row["created_at_local"] else "unknown",
+        "timezone": row["timezone"] or "",
+        "width": row["width"],
+        "height": row["height"],
+        "file_size": _format_size(row["file_size"]),
     }
+    if "score" in row:
+        formatted["score"] = row["score"]
+    return formatted
 
 
 @app.route("/related/<int:screenshot_id>")
@@ -204,12 +196,12 @@ def related(screenshot_id):
         screenshots = get_screenshots_by_ids(conn, all_ids)
     source = None
     if screenshot_id in screenshots:
-        source = _format_screenshot(screenshots[screenshot_id], screenshot_id)
+        source = _format_screenshot(screenshots[screenshot_id])
     related_results = []
     for mid in match_ids:
         if mid not in screenshots:
             continue
-        r = _format_screenshot(screenshots[mid], mid)
+        r = _format_screenshot(screenshots[mid])
         r["similarity"] = round(sim_by_id[mid], 3)
         related_results.append(r)
     return jsonify({"source": source, "related": related_results})
@@ -222,24 +214,10 @@ def timeline(screenshot_id):
     if focal is None:
         abort(404)
 
-    def fmt(row):
-        row_id, file_path, ocr_text, created_at_local, tz, width, height, file_size = row
-        return {
-            "id": row_id,
-            "file_path": file_path,
-            "name": Path(file_path).name,
-            "ocr_text": ocr_text or "",
-            "date": created_at_local.strftime("%Y-%m-%d · %I:%M %p · %A") if created_at_local else "unknown",
-            "timezone": tz or "",
-            "width": width,
-            "height": height,
-            "file_size": _format_size(file_size),
-        }
-
     return jsonify({
-        "before": [fmt(r) for r in before],
-        "focal": fmt(focal),
-        "after": [fmt(r) for r in after],
+        "before": [_format_screenshot(r) for r in before],
+        "focal": _format_screenshot(focal),
+        "after": [_format_screenshot(r) for r in after],
     })
 
 

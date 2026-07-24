@@ -83,7 +83,7 @@ def backfill_descriptions():
     with get_conn() as conn:
         pending = conn.execute(
             "SELECT count(*) FROM screenshots WHERE image_description IS NULL"
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         if pending == 0:
             print("All images already described.", file=sys.stderr)
@@ -101,12 +101,12 @@ def backfill_descriptions():
             if not rows:
                 break
 
-            for row_id, file_path in rows:
+            for row in rows:
                 try:
-                    image_type, description = describe_image(file_path)
+                    image_type, description = describe_image(row["file_path"])
                 except Exception as exc:
                     print(
-                        f"\nWarning: Failed on id {row_id}: {exc}",
+                        f"\nWarning: Failed on id {row['id']}: {exc}",
                         file=sys.stderr,
                     )
                     image_type = None
@@ -120,7 +120,7 @@ def backfill_descriptions():
                     {
                         "image_type": image_type,
                         "description": description,
-                        "id": row_id,
+                        "id": row["id"],
                     },
                 )
                 conn.commit()

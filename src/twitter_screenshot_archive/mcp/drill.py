@@ -29,27 +29,25 @@ async def get_tweet(id: int) -> str:
     if not row:
         return f"No screenshot with id {id}"
 
-    id, text, tweet_time, mentioned = row
-    lines = [f"Tweet ID {id}"]
-    if tweet_time:
-        lines.append(f"Tweet time: {tweet_time.isoformat()}")
-    if mentioned:
-        lines.append(f"Users: {', '.join('@' + u for u in mentioned)}")
+    lines = [f"Tweet ID {row['id']}"]
+    if row["tweet_time"]:
+        lines.append(f"Tweet time: {row['tweet_time'].isoformat()}")
+    if row["mentioned_users"]:
+        lines.append(f"Users: {', '.join('@' + u for u in row['mentioned_users'])}")
     lines.append("")
-    lines.append(text or "(no text)")
+    lines.append(row["ocr_text_clean"] or "(no text)")
 
     return "\n".join(lines)
 
 
 def _format_row(row) -> str:
     """Format a timeline row as plain text."""
-    id, text, tweet_time, mentioned = row
-    parts = [f"[ID {id}]"]
-    if tweet_time:
-        parts.append(tweet_time.isoformat())
-    if mentioned:
-        parts.append(", ".join("@" + u for u in _dedup_handles(mentioned)))
-    snippet = (text or "(no text)")[:SNIPPET_MAX_CHARS]
+    parts = [f"[ID {row['id']}]"]
+    if row["tweet_time"]:
+        parts.append(row["tweet_time"].isoformat())
+    if row["mentioned_users"]:
+        parts.append(", ".join("@" + u for u in _dedup_handles(row["mentioned_users"])))
+    snippet = (row["ocr_text_clean"] or "(no text)")[:SNIPPET_MAX_CHARS]
     parts.append(snippet)
     return " | ".join(parts)
 
@@ -83,9 +81,8 @@ async def nearby_screenshots(
         if not focal:
             return f"No screenshot with id {id}"
 
-        focal_time = focal[4]  # created_at
-        if focal_time is None:
-            return _format_row(focal[:4])
+        if focal["created_at"] is None:
+            return _format_row(focal)
 
         before_rows = conn.execute(
             """
@@ -97,7 +94,7 @@ async def nearby_screenshots(
             LIMIT %(limit)s
             """,
             {
-                "ts": focal_time,
+                "ts": focal["created_at"],
                 "id": id,
                 "limit": before,
             },
@@ -113,7 +110,7 @@ async def nearby_screenshots(
             LIMIT %(limit)s
             """,
             {
-                "ts": focal_time,
+                "ts": focal["created_at"],
                 "id": id,
                 "limit": after,
             },
@@ -122,7 +119,7 @@ async def nearby_screenshots(
     lines = []
     for row in reversed(before_rows):
         lines.append(_format_row(row))
-    lines.append(f">>> {_format_row(focal[:4])} <<<")
+    lines.append(f">>> {_format_row(focal)} <<<")
     for row in after_rows:
         lines.append(_format_row(row))
 
@@ -158,7 +155,7 @@ async def find_related(id: int, limit: int = 10) -> str:
             },
         ).fetchall()
 
-    row_by_id = {row[0]: row for row in rows}
+    row_by_id = {row["id"]: row for row in rows}
 
     lines = []
     for mid in match_ids:
@@ -167,11 +164,11 @@ async def find_related(id: int, limit: int = 10) -> str:
             continue
         sim = sim_by_id[mid]
         parts = [f"[ID {mid}] sim={sim:.2f}"]
-        if row[2]:  # tweet_time
-            parts.append(row[2].isoformat())
-        if row[3]:  # mentioned_users
-            parts.append(", ".join("@" + u for u in row[3]))
-        snippet = (row[1] or "(no text)")[:SNIPPET_MAX_CHARS]
+        if row["tweet_time"]:
+            parts.append(row["tweet_time"].isoformat())
+        if row["mentioned_users"]:
+            parts.append(", ".join("@" + u for u in row["mentioned_users"]))
+        snippet = (row["ocr_text_clean"] or "(no text)")[:SNIPPET_MAX_CHARS]
         parts.append(snippet)
         lines.append(" | ".join(parts))
 
@@ -228,15 +225,18 @@ async def search_by_user(
     with get_conn() as conn:
         stats = conn.execute(
             f"""
-            SELECT COUNT(*),
-                   MIN(COALESCE(tweet_time, created_at)),
-                   MAX(COALESCE(tweet_time, created_at))
+            SELECT
+                count(*) AS tweet_count,
+                min(COALESCE(tweet_time, created_at)) AS earliest,
+                max(COALESCE(tweet_time, created_at)) AS latest
             FROM screenshots
             WHERE {where}
             """,
             params,
         ).fetchone()
-        total, earliest, latest = stats
+        total = stats["tweet_count"]
+        earliest = stats["earliest"]
+        latest = stats["latest"]
 
         rows = conn.execute(
             f"""
@@ -314,9 +314,9 @@ async def interactions(
 
     with get_conn() as conn:
         total = conn.execute(
-            f"SELECT COUNT(*) FROM screenshots WHERE {where}",
+            f"SELECT count(*) FROM screenshots WHERE {where}",
             params,
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         rows = conn.execute(
             f"""

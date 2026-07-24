@@ -86,7 +86,7 @@ async def tweet_activity(
     bucket = f"date_trunc(%(granularity)s, COALESCE(tweet_time, created_at))"
     params["granularity"] = granularity
 
-    select_cols = [f"{bucket} AS bucket", "COUNT(*) AS cnt"]
+    select_cols = [f"{bucket} AS bucket", "count(*) AS tweet_count"]
     if query:
         select_cols.append(
             f"MAX(1 - (embedding <=> %(vec)s::vector)) AS max_sim"
@@ -119,8 +119,8 @@ async def tweet_activity(
         return f"No activity found ({', '.join(parts) or 'no filters'})."
 
     # Find max count for bar scaling
-    max_count = max(r[1] for r in rows)
-    total = sum(r[1] for r in rows)
+    max_count = max(r["tweet_count"] for r in rows)
+    total = sum(r["tweet_count"] for r in rows)
     bar_width = 20
 
     # Format output
@@ -137,8 +137,8 @@ async def tweet_activity(
     lines.append("")
 
     for row in rows:
-        bucket_date = row[0]
-        count = row[1]
+        bucket_date = row["bucket"]
+        count = row["tweet_count"]
 
         if granularity == "day":
             label = bucket_date.strftime("%Y-%m-%d")
@@ -153,10 +153,9 @@ async def tweet_activity(
         bar = "\u2588" * bar_len
 
         if query:
-            max_sim = row[2]
-            score_str = f"max={max_sim:.2f}"
+            score_str = f"max={row['max_sim']:.2f}"
             if include_mean:
-                score_str += f"  mean={row[3]:.2f}"
+                score_str += f"  mean={row['mean_sim']:.2f}"
             lines.append(f"{label}  {count:>5}  {score_str}  {bar}")
         else:
             lines.append(f"{label}  {count:>5}  {bar}")

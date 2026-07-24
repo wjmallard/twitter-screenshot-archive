@@ -68,7 +68,7 @@ def backfill_embeddings():
         pending = conn.execute(
             "SELECT count(*) FROM screenshots "
             "WHERE ocr_text_clean IS NOT NULL AND ocr_text_clean != '' AND embedding IS NULL"
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         if pending == 0:
             return
@@ -89,9 +89,9 @@ def backfill_embeddings():
                 break
 
             # Sort by text length to minimize padding waste within the batch
-            pairs = sorted(rows, key=lambda r: len(r[1]))
-            ids = [r[0] for r in pairs]
-            texts = [r[1] for r in pairs]
+            pairs = sorted(rows, key=lambda r: len(r["ocr_text_clean"]))
+            ids = [r["id"] for r in pairs]
+            texts = [r["ocr_text_clean"] for r in pairs]
             embeddings = embed_texts(texts)
 
             for row_id, emb in zip(ids, embeddings):

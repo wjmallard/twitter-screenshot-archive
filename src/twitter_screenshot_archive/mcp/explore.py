@@ -245,8 +245,8 @@ async def similar_users(
     neighbor_count = 0
 
     with get_conn() as conn:
-        for source_id, emb_text in source_rows:
-            vec = vec_literal(json.loads(emb_text))
+        for source in source_rows:
+            vec = vec_literal(json.loads(source["embedding"]))
             neighbor_params: dict = {
                 "vec": vec,
                 "handle": handle,
@@ -270,9 +270,9 @@ async def similar_users(
                 neighbor_params,
             ).fetchall()
 
-            for (mentioned,) in neighbors:
+            for neighbor in neighbors:
                 neighbor_count += 1
-                for u in (mentioned or []):
+                for u in (neighbor["mentioned_users"] or []):
                     user_counts[u] = user_counts.get(u, 0) + 1
 
     user_counts = _merge_similar_handles(user_counts, primary=handle)

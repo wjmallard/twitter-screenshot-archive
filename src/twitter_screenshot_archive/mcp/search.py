@@ -10,19 +10,17 @@ from .embedding import embed_texts, vec_literal
 from .server import mcp
 
 
-def _format_result(index: int, total: int, row, has_sim: bool) -> str:
+def _format_result(index: int, total: int, row) -> str:
     """Format a single search result as plain text."""
-    id, text, tweet_time, mentioned = row[:4]
-    sim = row[4] if has_sim else None
-    parts = [f"[{index}/{total}] ID {id}"]
+    lines = [f"[{index}/{total}] ID {row['id']}"]
+    sim = row.get("similarity")
     if sim is not None:
-        parts[0] += f" | sim: {sim:.2f}"
-    if tweet_time:
-        parts[0] += f" | {tweet_time.isoformat()}"
-    lines = parts
-    if mentioned:
-        lines.append(f"Users: {', '.join('@' + u for u in mentioned)}")
-    snippet = (text or "")[:SNIPPET_MAX_CHARS]
+        lines[0] += f" | sim: {sim:.2f}"
+    if row["tweet_time"]:
+        lines[0] += f" | {row['tweet_time'].isoformat()}"
+    if row["mentioned_users"]:
+        lines.append(f"Users: {', '.join('@' + u for u in row['mentioned_users'])}")
+    snippet = (row["ocr_text_clean"] or "")[:SNIPPET_MAX_CHARS]
     if snippet:
         lines.append(snippet)
     return "\n".join(lines)
@@ -122,9 +120,9 @@ async def search_tweets(
 
     with get_conn() as conn:
         total = conn.execute(
-            f"SELECT COUNT(*) FROM screenshots WHERE {where}",
+            f"SELECT count(*) FROM screenshots WHERE {where}",
             params,
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         rows = conn.execute(
             f"""
@@ -160,6 +158,6 @@ async def search_tweets(
         header = f"Found {total} results for: {desc} ({sort_label})"
     parts = [header + "\n"]
     for i, row in enumerate(rows, start):
-        parts.append(_format_result(i, total, row, has_sim=has_query))
+        parts.append(_format_result(i, total, row))
 
     return "\n\n".join(parts)

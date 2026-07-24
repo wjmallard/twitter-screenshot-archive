@@ -22,18 +22,12 @@ from .utils import _merge_similar_handles
 
 
 def _parse_rows(db_rows: list) -> list[dict]:
-    """Parse DB rows into dicts with numpy embeddings."""
+    """Parse DB rows, decoding embedding text into numpy arrays."""
     rows = []
     for r in db_rows:
-        rows.append({
-            "id": r[0],
-            "ocr_text_clean": r[1],
-            "tweet_time": r[2],
-            "mentioned_users": r[3],
-            "embedding": np.array(json.loads(r[4]), dtype=np.float32),
-            "created_at": r[5],
-            "minhash_signature": r[6],
-        })
+        row = dict(r)
+        row["embedding"] = np.array(json.loads(r["embedding"]), dtype=np.float32)
+        rows.append(row)
     return rows
 
 

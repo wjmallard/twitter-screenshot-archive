@@ -2,6 +2,7 @@ import sys
 
 import psycopg
 from contextlib import contextmanager
+from psycopg.rows import dict_row
 
 from . import config
 
@@ -20,7 +21,7 @@ def check_db():
 
 @contextmanager
 def get_conn():
-    conn = psycopg.connect(dbname=DB_NAME)
+    conn = psycopg.connect(dbname=DB_NAME, row_factory=dict_row)
     try:
         yield conn
         conn.commit()
@@ -84,7 +85,7 @@ def upsert_screenshot(conn, row):
 
 def images_in_db(conn) -> set[str]:
     rows = conn.execute("SELECT file_path FROM screenshots").fetchall()
-    return {row[0] for row in rows}
+    return {row["file_path"] for row in rows}
 
 
 _HALF_LIFE_SECS = config.DECAY_HALF_LIFE_DAYS * 86400
@@ -203,7 +204,7 @@ def count_fulltext(conn, query):
             "query": query,
         },
     ).fetchone()
-    return row[0]
+    return row["count"]
 
 
 def count_trigram(conn, query):
@@ -217,7 +218,7 @@ def count_trigram(conn, query):
             "query": query,
         },
     ).fetchone()
-    return row[0]
+    return row["count"]
 
 
 def count_exact(conn, query):
@@ -231,20 +232,26 @@ def count_exact(conn, query):
             "pattern": f"%{query}%",
         },
     ).fetchone()
-    return row[0]
+    return row["count"]
 
 
 def count_screenshots(conn):
     row = conn.execute("SELECT count(*) FROM screenshots").fetchone()
-    return row[0]
+    return row["count"]
 
 
 def signature_fingerprint(conn):
     """Return (count, max_id) for cache invalidation of the LSH index."""
     row = conn.execute(
-        "SELECT count(*), coalesce(max(id), 0) FROM screenshots WHERE minhash_signature IS NOT NULL"
+        """
+        SELECT
+            count(*) AS sig_count,
+            coalesce(max(id), 0) AS max_id
+        FROM screenshots
+        WHERE minhash_signature IS NOT NULL
+        """
     ).fetchone()
-    return (row[0], row[1])
+    return (row["sig_count"], row["max_id"])
 
 
 def load_all_signatures(conn):
@@ -257,8 +264,7 @@ def load_all_signatures(conn):
 def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
     """Get screenshots around a given screenshot in capture-time order.
 
-    Returns (before_rows, focal_row, after_rows) where each row is
-    (id, file_path, ocr_text, created_at_local, timezone, width, height, file_size).
+    Returns (before_rows, focal_row, after_rows) of screenshot row dicts.
     """
     focal = conn.execute(
         """
@@ -282,9 +288,8 @@ def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
     if not focal:
         return [], None, []
 
-    focal_time = focal[8]  # created_at
-    if focal_time is None:
-        return [], focal[:8], []
+    if focal["created_at"] is None:
+        return [], focal, []
 
     before_rows = conn.execute(
         """
@@ -304,7 +309,7 @@ def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
         LIMIT %(limit)s
         """,
         {
-            "ts": focal_time,
+            "ts": focal["created_at"],
             "id": screenshot_id,
             "limit": before,
         },
@@ -328,13 +333,13 @@ def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
         LIMIT %(limit)s
         """,
         {
-            "ts": focal_time,
+            "ts": focal["created_at"],
             "id": screenshot_id,
             "limit": after,
         },
     ).fetchall()
 
-    return list(reversed(before_rows)), focal[:8], list(after_rows)
+    return list(reversed(before_rows)), focal, list(after_rows)
 
 
 def get_screenshots_by_ids(conn, ids):
@@ -359,15 +364,4 @@ def get_screenshots_by_ids(conn, ids):
             "ids": list(ids),
         },
     ).fetchall()
-    return {
-        row[0]: {
-            "file_path": row[1],
-            "ocr_text": row[2],
-            "created_at_local": row[3],
-            "timezone": row[4],
-            "width": row[5],
-            "height": row[6],
-            "file_size": row[7],
-        }
-        for row in rows
-    }
+    return {row["id"]: row for row in rows}
