@@ -165,6 +165,12 @@ def search_trigram(conn, query, limit=50, offset=0, sort="best"):
     ).fetchall()
 
 
+def _like_pattern(query):
+    """Escape LIKE wildcards so user input matches literally."""
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 def search_exact(conn, query, limit=50, offset=0, sort="best"):
     order = _resolve_sort(sort, "none")
     return conn.execute(
@@ -186,7 +192,7 @@ def search_exact(conn, query, limit=50, offset=0, sort="best"):
         OFFSET %(offset)s
         """,
         {
-            "pattern": f"%{query}%",
+            "pattern": _like_pattern(query),
             "limit": limit,
             "offset": offset,
         },
@@ -229,7 +235,7 @@ def count_exact(conn, query):
         WHERE ocr_text ILIKE %(pattern)s
         """,
         {
-            "pattern": f"%{query}%",
+            "pattern": _like_pattern(query),
         },
     ).fetchone()
     return row["count"]
