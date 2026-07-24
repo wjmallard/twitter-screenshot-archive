@@ -1,10 +1,11 @@
 """Flask search GUI for screenshot search."""
 
 import argparse
+import hashlib
 import mimetypes
 import os
+import tempfile
 from importlib.util import find_spec
-from io import BytesIO
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, render_template, request, send_file
@@ -27,6 +28,8 @@ app = Flask(__name__)
 PER_PAGE = config.RESULTS_PER_PAGE
 
 _IMAGE_ROOT = config.SCREENSHOT_DIR.resolve()
+
+_THUMB_DIR = Path.home() / ".cache" / "twitter-screenshot-archive" / "thumbs"
 
 # Semantic search needs MLX (installed with the mcp extra); hide the
 # option when it isn't available rather than erroring.
@@ -132,19 +135,25 @@ def serve_image():
         abort(404)
 
     if request.args.get("thumb"):
-        img = Image.open(p)
-        img.thumbnail((800, 800))
         fmt = "PNG" if p.suffix.lower() == ".png" else "JPEG"
-        if fmt == "JPEG" and img.mode not in ("RGB", "L"):
-            img = img.convert("RGB")
-        buf = BytesIO()
-        img.save(buf, format=fmt)
-        buf.seek(0)
+        ext = ".png" if fmt == "PNG" else ".jpg"
+        key = hashlib.sha1(f"{p}:{p.stat().st_mtime_ns}".encode()).hexdigest()
+        cached = _THUMB_DIR / f"{key}{ext}"
+        if not cached.is_file():
+            img = Image.open(p)
+            img.thumbnail((800, 800))
+            if fmt == "JPEG" and img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+            _THUMB_DIR.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=_THUMB_DIR, suffix=ext)
+            with os.fdopen(fd, "wb") as f:
+                img.save(f, format=fmt)
+            os.replace(tmp, cached)
         mime = "image/png" if fmt == "PNG" else "image/jpeg"
-        return send_file(buf, mimetype=mime)
+        return send_file(cached, mimetype=mime, max_age=86400)
 
     mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
-    return send_file(p, mimetype=mime)
+    return send_file(p, mimetype=mime, max_age=86400)
 
 
 def _format_screenshot(row):
