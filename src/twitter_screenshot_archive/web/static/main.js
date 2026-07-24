@@ -1,3 +1,15 @@
+// Auto-submit when search options change
+(function() {
+    const form = document.querySelector('.search-bar');
+    if (!form) return;
+    const q = form.querySelector('input[name=q]');
+    form.querySelectorAll('input[type=radio], input[type=date]').forEach(function(el) {
+        el.addEventListener('change', function() {
+            if (q.value.trim()) form.submit();
+        });
+    });
+})();
+
 // Lightbox
 (function() {
     const lightbox = document.getElementById('lightbox');
