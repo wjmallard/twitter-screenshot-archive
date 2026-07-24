@@ -91,8 +91,20 @@ def images_in_db(conn) -> set[str]:
 _HALF_LIFE_SECS = config.DECAY_HALF_LIFE_DAYS * 86400
 _DECAY = f"(1.0 / (EXTRACT(EPOCH FROM now() - COALESCE(created_at, now())) / {_HALF_LIFE_SECS} + 1))"
 
-_FT_SCORE = "ts_rank(ocr_text_tsv, websearch_to_tsquery('english', %(query)s))"
-_TG_SCORE = "word_similarity(%(query)s, ocr_text)"
+# OCR text is the primary field (x2 weight); VLM descriptions are the
+# secondary signal — useful when OCR is garbage but the image is legible.
+_FT_SCORE = (
+    "GREATEST("
+    "ts_rank(ocr_text_tsv, websearch_to_tsquery('english', %(query)s)) * 2, "
+    "ts_rank(description_tsv, websearch_to_tsquery('english', %(query)s))"
+    ")"
+)
+_TG_SCORE = (
+    "GREATEST("
+    "word_similarity(%(query)s, ocr_text) * 2, "
+    "word_similarity(%(query)s, image_description)"
+    ")"
+)
 
 SORT_OPTIONS = {
     "best": {"word": f"{_FT_SCORE} * {_DECAY} DESC", "char": f"{_TG_SCORE} * {_DECAY} DESC", "none": f"{_DECAY} DESC"},
@@ -122,9 +134,10 @@ def search_fulltext(conn, query, limit=50, offset=0, sort="best"):
             width,
             height,
             file_size,
-            ts_rank(ocr_text_tsv, websearch_to_tsquery('english', %(query)s)) AS score
+            {_FT_SCORE} AS score
         FROM screenshots
         WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %(query)s)
+           OR description_tsv @@ websearch_to_tsquery('english', %(query)s)
         ORDER BY {order}
         LIMIT %(limit)s
         OFFSET %(offset)s
@@ -138,9 +151,16 @@ def search_fulltext(conn, query, limit=50, offset=0, sort="best"):
 
 
 def search_trigram(conn, query, limit=50, offset=0, sort="best"):
+    # The CTE keeps the <<% filters on their GIN indexes; word_similarity
+    # scoring then only touches the matched rows.
     order = _resolve_sort(sort, "char")
     return conn.execute(
         f"""
+        WITH matches AS (
+            SELECT id FROM screenshots WHERE %(query)s <<%% ocr_text
+            UNION
+            SELECT id FROM screenshots WHERE %(query)s <<%% image_description
+        )
         SELECT
             id,
             file_path,
@@ -150,9 +170,9 @@ def search_trigram(conn, query, limit=50, offset=0, sort="best"):
             width,
             height,
             file_size,
-            word_similarity(%(query)s, ocr_text) AS score
+            {_TG_SCORE} AS score
         FROM screenshots
-        WHERE %(query)s <<%% ocr_text
+        WHERE id IN (SELECT id FROM matches)
         ORDER BY {order}
         LIMIT %(limit)s
         OFFSET %(offset)s
@@ -187,6 +207,7 @@ def search_exact(conn, query, limit=50, offset=0, sort="best"):
             1.0 AS score
         FROM screenshots
         WHERE ocr_text ILIKE %(pattern)s
+           OR image_description ILIKE %(pattern)s
         ORDER BY {order}
         LIMIT %(limit)s
         OFFSET %(offset)s
@@ -205,6 +226,7 @@ def count_fulltext(conn, query):
         SELECT count(*)
         FROM screenshots
         WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %(query)s)
+           OR description_tsv @@ websearch_to_tsquery('english', %(query)s)
         """,
         {
             "query": query,
@@ -217,8 +239,11 @@ def count_trigram(conn, query):
     row = conn.execute(
         """
         SELECT count(*)
-        FROM screenshots
-        WHERE %(query)s <<%% ocr_text
+        FROM (
+            SELECT id FROM screenshots WHERE %(query)s <<%% ocr_text
+            UNION
+            SELECT id FROM screenshots WHERE %(query)s <<%% image_description
+        ) AS matches
         """,
         {
             "query": query,
@@ -233,6 +258,7 @@ def count_exact(conn, query):
         SELECT count(*)
         FROM screenshots
         WHERE ocr_text ILIKE %(pattern)s
+           OR image_description ILIKE %(pattern)s
         """,
         {
             "pattern": _like_pattern(query),
