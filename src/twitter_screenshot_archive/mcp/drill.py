@@ -28,7 +28,9 @@ def get_tweet(id: int) -> str:
                 id,
                 ocr_text_clean,
                 tweet_time,
-                mentioned_users
+                mentioned_users,
+                image_type,
+                image_description
             FROM screenshots
             WHERE id = %(id)s
             """,
@@ -68,6 +70,12 @@ def get_tweet(id: int) -> str:
         lines.append(f"Users: {', '.join('@' + u for u in row['mentioned_users'])}")
     lines.append("")
     lines.append(row["ocr_text_clean"] or "(no text)")
+
+    description = row["image_description"]
+    if description and not description.startswith("[error:"):
+        lines.append("")
+        lines.append(f"VLM transcription ({row['image_type'] or 'unclassified'}):")
+        lines.append(description)
 
     shown = matches[:3]
     if shown:
