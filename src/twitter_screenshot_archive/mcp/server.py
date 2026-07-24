@@ -35,7 +35,9 @@ DRILL (follow threads once you have a foothold):
   find_related(id)   — lexically similar tweets (same thread/conversation)
   nearby_screenshots(id) — screenshots captured around the same time
   search_by_user(handle) — all tweets mentioning a specific @user
-  get_tweet(id)      — full OCR text of one screenshot
+  get_tweet(id)      — full OCR text of one screenshot, plus the exact
+                       matched tweet text from the owner's Twitter export
+                       when available (prefer it over OCR when they differ)
   interactions(user1, user2) — tweets where two users appear together
 
 Typical workflows:

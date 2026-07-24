@@ -1,5 +1,7 @@
 """Drill tools — get_tweet, nearby_screenshots, find_related, search_by_user, interactions."""
 
+import html
+
 from ..core.db import get_conn, get_timeline_neighbors
 from ..core.minhash import query_related
 from . import server
@@ -17,7 +19,8 @@ mcp = server.mcp
 
 @mcp.tool()
 def get_tweet(id: int) -> str:
-    """Get the full OCR text of a specific tweet by ID."""
+    """Get the full OCR text of a specific tweet by ID, plus the exact
+    text of any matching tweet from the owner's Twitter export."""
     with get_conn() as conn:
         row = conn.execute(
             """
@@ -34,8 +37,29 @@ def get_tweet(id: int) -> str:
             },
         ).fetchone()
 
-    if not row:
-        return f"No screenshot with id {id}"
+        if not row:
+            return f"No screenshot with id {id}"
+
+        matches = conn.execute(
+            """
+            SELECT
+                m.tweet_id,
+                m.score,
+                COALESCE(t.full_text, l.full_text) AS full_text,
+                COALESCE(t.created_at, l.snowflake_date) AS tweet_time,
+                COALESCE(t.account, l.account) AS account,
+                (t.tweet_id IS NOT NULL) AS authored
+            FROM screenshot_tweet_matches m
+            LEFT JOIN twitter_tweets t ON t.tweet_id = m.tweet_id
+            LEFT JOIN twitter_likes l ON l.tweet_id = m.tweet_id
+            WHERE m.screenshot_id = %(id)s
+              AND COALESCE(t.full_text, l.full_text) IS NOT NULL
+            ORDER BY m.score DESC
+            """,
+            {
+                "id": id,
+            },
+        ).fetchall()
 
     lines = [f"Tweet ID {row['id']}"]
     if row["tweet_time"]:
@@ -44,6 +68,21 @@ def get_tweet(id: int) -> str:
         lines.append(f"Users: {', '.join('@' + u for u in row['mentioned_users'])}")
     lines.append("")
     lines.append(row["ocr_text_clean"] or "(no text)")
+
+    shown = matches[:3]
+    if shown:
+        lines.append("")
+        lines.append("Matched tweets from the Twitter export (exact text, no OCR errors):")
+        for m in shown:
+            label = "authored by" if m["authored"] else "liked via"
+            header = f"[{label} @{m['account']}] tweet {m['tweet_id']}"
+            if m["tweet_time"]:
+                header += f" | {m['tweet_time'].isoformat()}"
+            header += f" | match score {m['score']:.0f}"
+            lines.append(header)
+            lines.append(html.unescape(m["full_text"]))
+        if len(matches) > len(shown):
+            lines.append(f"(+{len(matches) - len(shown)} more matches)")
 
     return "\n".join(lines)
 
