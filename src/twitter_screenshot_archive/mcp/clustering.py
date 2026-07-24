@@ -18,7 +18,11 @@ from .config import (
     TOPIC_SIM_THRESHOLD_PCT,
 )
 from .embedding import embed_texts, vec_literal
-from .utils import _merge_similar_handles
+from .utils import (
+    add_time_filter,
+    add_users_filter,
+    merge_similar_handles,
+)
 
 
 def _parse_rows(db_rows: list) -> list[dict]:
@@ -50,17 +54,8 @@ async def _fetch_relevant(
     """
     date_conditions = []
     date_params: dict = {}
-
-    if after:
-        date_conditions.append("COALESCE(tweet_time, created_at) >= %(after)s::date")
-        date_params["after"] = after
-    if before:
-        date_conditions.append("COALESCE(tweet_time, created_at) < %(before)s::date")
-        date_params["before"] = before
-    if users:
-        normalized = [u.lstrip("@").lower() for u in users]
-        date_conditions.append("mentioned_users && %(users)s::text[]")
-        date_params["users"] = normalized
+    add_time_filter(date_conditions, date_params, after, before)
+    add_users_filter(date_conditions, date_params, users)
 
     if topics:
         topic_embeddings = embed_texts(topics)
@@ -204,7 +199,7 @@ def _build_cluster(members: list[dict]) -> dict:
     for m in members:
         for u in (m["mentioned_users"] or []):
             user_counts[u] = user_counts.get(u, 0) + 1
-    user_counts = _merge_similar_handles(user_counts)
+    user_counts = merge_similar_handles(user_counts)
     top_users = sorted(user_counts, key=user_counts.get, reverse=True)[:5]
 
     return {

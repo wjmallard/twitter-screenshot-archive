@@ -8,6 +8,11 @@ from .config import (
 )
 from .embedding import embed_texts, vec_literal
 from .server import mcp
+from .utils import (
+    add_time_filter,
+    add_users_filter,
+    validate_keywords,
+)
 
 
 def _format_result(index: int, total: int, row) -> str:
@@ -80,27 +85,13 @@ async def search_tweets(
         params["floor"] = min_score
 
     if keywords:
-        try:
-            with get_conn() as conn:
-                conn.execute(
-                    "SELECT to_tsquery('english', %(kw)s)",
-                    {"kw": keywords},
-                )
-        except Exception:
+        if not validate_keywords(keywords):
             return f"Error: invalid keywords syntax: {keywords!r}"
         conditions.append("ocr_text_tsv @@ to_tsquery('english', %(keywords)s)")
         params["keywords"] = keywords
 
-    if after:
-        conditions.append("COALESCE(tweet_time, created_at) >= %(after)s::date")
-        params["after"] = after
-    if before:
-        conditions.append("COALESCE(tweet_time, created_at) < %(before)s::date")
-        params["before"] = before
-    if users:
-        normalized = [u.lstrip("@").lower() for u in users]
-        conditions.append("mentioned_users && %(users)s::text[]")
-        params["users"] = normalized
+    add_time_filter(conditions, params, after, before)
+    add_users_filter(conditions, params, users)
 
     where = " AND ".join(conditions) if conditions else "TRUE"
 

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from ..core.db import get_conn
 from .server import mcp
+from .utils import add_time_filter
 
 
 @mcp.tool()
@@ -55,13 +56,7 @@ async def count_screenshots(
     """
     conditions = []
     params: dict = {}
-
-    if after:
-        conditions.append("created_at >= %(after)s::date")
-        params["after"] = after
-    if before:
-        conditions.append("created_at < %(before)s::date")
-        params["before"] = before
+    add_time_filter(conditions, params, after, before, column="created_at")
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 

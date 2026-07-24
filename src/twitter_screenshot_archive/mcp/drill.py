@@ -6,7 +6,11 @@ from . import server
 from .config import (
     SNIPPET_MAX_CHARS,
 )
-from .utils import _dedup_handles
+from .utils import (
+    add_time_filter,
+    dedup_handles,
+    normalize_handle,
+)
 
 mcp = server.mcp
 
@@ -46,7 +50,7 @@ def _format_row(row) -> str:
     if row["tweet_time"]:
         parts.append(row["tweet_time"].isoformat())
     if row["mentioned_users"]:
-        parts.append(", ".join("@" + u for u in _dedup_handles(row["mentioned_users"])))
+        parts.append(", ".join("@" + u for u in dedup_handles(row["mentioned_users"])))
     snippet = (row["ocr_text_clean"] or "(no text)")[:SNIPPET_MAX_CHARS]
     parts.append(snippet)
     return " | ".join(parts)
@@ -150,7 +154,7 @@ async def search_by_user(
         before: Only include tweets before this date (YYYY-MM-DD).
         sort: "newest" (default) or "oldest".
     """
-    handle = handle.lstrip("@").lower()
+    handle = normalize_handle(handle)
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
 
@@ -160,14 +164,7 @@ async def search_by_user(
         "limit": limit,
         "offset": offset,
     }
-
-    if after:
-        conditions.append("COALESCE(tweet_time, created_at) >= %(after)s::date")
-        params["after"] = after
-    if before:
-        conditions.append("COALESCE(tweet_time, created_at) < %(before)s::date")
-        params["before"] = before
-
+    add_time_filter(conditions, params, after, before)
     where = " AND ".join(conditions)
 
     if sort == "oldest":
@@ -245,8 +242,8 @@ async def interactions(
         after: Only include tweets after this date (YYYY-MM-DD).
         before: Only include tweets before this date (YYYY-MM-DD).
     """
-    user1 = user1.lstrip("@").lower()
-    user2 = user2.lstrip("@").lower()
+    user1 = normalize_handle(user1)
+    user2 = normalize_handle(user2)
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
 
@@ -257,14 +254,7 @@ async def interactions(
         "limit": limit,
         "offset": offset,
     }
-
-    if after:
-        conditions.append("COALESCE(tweet_time, created_at) >= %(after)s::date")
-        params["after"] = after
-    if before:
-        conditions.append("COALESCE(tweet_time, created_at) < %(before)s::date")
-        params["before"] = before
-
+    add_time_filter(conditions, params, after, before)
     where = " AND ".join(conditions)
 
     with get_conn() as conn:

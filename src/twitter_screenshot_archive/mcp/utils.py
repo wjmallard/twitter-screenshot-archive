@@ -1,7 +1,58 @@
 """Shared MCP utilities."""
 
+from ..core.db import get_conn
 
-def _merge_similar_handles(
+
+def add_time_filter(
+    conditions: list[str],
+    params: dict,
+    after: str | None,
+    before: str | None,
+    column: str = "COALESCE(tweet_time, created_at)",
+) -> None:
+    """Append after/before date conditions and params in place."""
+    if after:
+        conditions.append(f"{column} >= %(after)s::date")
+        params["after"] = after
+    if before:
+        conditions.append(f"{column} < %(before)s::date")
+        params["before"] = before
+
+
+def add_users_filter(
+    conditions: list[str],
+    params: dict,
+    users: list[str] | None,
+) -> None:
+    """Append a mentioned_users overlap condition and param in place."""
+    if users:
+        conditions.append("mentioned_users && %(users)s::text[]")
+        params["users"] = normalize_handles(users)
+
+
+def normalize_handle(handle: str) -> str:
+    """Strip a leading @ and lowercase."""
+    return handle.lstrip("@").lower()
+
+
+def normalize_handles(handles: list[str]) -> list[str]:
+    return [normalize_handle(h) for h in handles]
+
+
+def validate_keywords(keywords: str) -> bool:
+    """Check tsquery syntax by parsing it server-side."""
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                "SELECT to_tsquery('english', %(kw)s)",
+                {"kw": keywords},
+            )
+        return True
+    except Exception:
+        return False
+
+
+def merge_similar_handles(
     user_counts: dict[str, int],
     primary: str | None = None,
 ) -> dict[str, int]:
@@ -39,7 +90,7 @@ def _merge_similar_handles(
     return merged
 
 
-def _dedup_handles(handles: list[str] | None) -> list[str]:
+def dedup_handles(handles: list[str] | None) -> list[str]:
     """Deduplicate a handle list by prefix overlap, keeping the longest."""
     if not handles:
         return []

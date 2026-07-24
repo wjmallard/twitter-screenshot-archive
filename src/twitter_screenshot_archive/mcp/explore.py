@@ -12,7 +12,11 @@ from .config import (
 )
 from .embedding import vec_literal
 from .server import mcp
-from .utils import _merge_similar_handles
+from .utils import (
+    add_time_filter,
+    merge_similar_handles,
+    normalize_handle,
+)
 
 
 def _pick_snippets(medoid: dict, members: list[dict], max_snippets: int) -> list[dict]:
@@ -165,7 +169,7 @@ async def top_users(
         for u in (r["mentioned_users"] or []):
             user_counts[u] = user_counts.get(u, 0) + 1
 
-    user_counts = _merge_similar_handles(user_counts)
+    user_counts = merge_similar_handles(user_counts)
 
     if not user_counts:
         return "No users mentioned in matching tweets."
@@ -206,7 +210,7 @@ async def similar_users(
         limit: Number of similar users to return (default 10).
         k: Neighbors per source tweet (default 5).
     """
-    handle = handle.lstrip("@").lower()
+    handle = normalize_handle(handle)
 
     # Fetch embeddings for all tweets mentioning this user
     source_conditions = [
@@ -214,14 +218,7 @@ async def similar_users(
         "embedding IS NOT NULL",
     ]
     params: dict = {"handle": handle}
-
-    if after:
-        source_conditions.append("COALESCE(tweet_time, created_at) >= %(after)s::date")
-        params["after"] = after
-    if before:
-        source_conditions.append("COALESCE(tweet_time, created_at) < %(before)s::date")
-        params["before"] = before
-
+    add_time_filter(source_conditions, params, after, before)
     source_where = " AND ".join(source_conditions)
 
     with get_conn() as conn:
@@ -234,36 +231,28 @@ async def similar_users(
         return f"No embedded tweets found mentioning @{handle}"
 
     # For each source tweet, find K nearest neighbors that don't mention the handle
-    date_conditions = []
-    if after:
-        date_conditions.append("COALESCE(tweet_time, created_at) >= %(after)s::date")
-    if before:
-        date_conditions.append("COALESCE(tweet_time, created_at) < %(before)s::date")
-    date_where = (" AND " + " AND ".join(date_conditions)) if date_conditions else ""
+    neighbor_conditions = [
+        "embedding IS NOT NULL",
+        "NOT (%(handle)s = ANY(mentioned_users))",
+    ]
+    neighbor_params: dict = {
+        "handle": handle,
+        "k": k,
+    }
+    add_time_filter(neighbor_conditions, neighbor_params, after, before)
+    neighbor_where = " AND ".join(neighbor_conditions)
 
     user_counts: dict[str, int] = {}
     neighbor_count = 0
 
     with get_conn() as conn:
         for source in source_rows:
-            vec = vec_literal(json.loads(source["embedding"]))
-            neighbor_params: dict = {
-                "vec": vec,
-                "handle": handle,
-                "k": k,
-            }
-            if after:
-                neighbor_params["after"] = after
-            if before:
-                neighbor_params["before"] = before
-
+            neighbor_params["vec"] = vec_literal(json.loads(source["embedding"]))
             neighbors = conn.execute(
                 f"""
                 SELECT mentioned_users
                 FROM screenshots
-                WHERE embedding IS NOT NULL
-                  AND NOT (%(handle)s = ANY(mentioned_users))
-                  {date_where}
+                WHERE {neighbor_where}
                 ORDER BY embedding <=> %(vec)s::vector
                 LIMIT %(k)s
                 """,
@@ -275,7 +264,7 @@ async def similar_users(
                 for u in (neighbor["mentioned_users"] or []):
                     user_counts[u] = user_counts.get(u, 0) + 1
 
-    user_counts = _merge_similar_handles(user_counts, primary=handle)
+    user_counts = merge_similar_handles(user_counts, primary=handle)
 
     if not user_counts:
         return f"No other users found in tweets similar to @{handle}"

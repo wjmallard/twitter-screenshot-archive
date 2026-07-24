@@ -4,6 +4,11 @@ from ..core.db import get_conn
 from .config import SEARCH_SIMILARITY_FLOOR
 from .embedding import embed_texts, vec_literal
 from .server import mcp
+from .utils import (
+    add_time_filter,
+    add_users_filter,
+    validate_keywords,
+)
 
 _GRANULARITY_LABELS = {
     "day": "daily",
@@ -42,15 +47,8 @@ async def tweet_activity(
     if granularity not in _GRANULARITY_LABELS:
         return f"Error: granularity must be one of: {', '.join(sorted(_GRANULARITY_LABELS))}"
 
-    if keywords:
-        try:
-            with get_conn() as conn:
-                conn.execute(
-                    "SELECT to_tsquery('english', %(kw)s)",
-                    {"kw": keywords},
-                )
-        except Exception:
-            return f"Error: invalid keywords syntax: {keywords!r}"
+    if keywords and not validate_keywords(keywords):
+        return f"Error: invalid keywords syntax: {keywords!r}"
 
     conditions = ["ocr_text_clean IS NOT NULL"]
     params: dict = {}
@@ -69,16 +67,8 @@ async def tweet_activity(
         conditions.append("ocr_text_tsv @@ to_tsquery('english', %(keywords)s)")
         params["keywords"] = keywords
 
-    if after:
-        conditions.append("COALESCE(tweet_time, created_at) >= %(after)s::date")
-        params["after"] = after
-    if before:
-        conditions.append("COALESCE(tweet_time, created_at) < %(before)s::date")
-        params["before"] = before
-    if users:
-        normalized = [u.lstrip("@").lower() for u in users]
-        conditions.append("mentioned_users && %(users)s::text[]")
-        params["users"] = normalized
+    add_time_filter(conditions, params, after, before)
+    add_users_filter(conditions, params, users)
 
     where = " AND ".join(conditions)
 
