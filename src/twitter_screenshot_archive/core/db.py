@@ -261,23 +261,33 @@ def load_all_signatures(conn):
     ).fetchall()
 
 
+# Columns needed by both consumers of get_timeline_neighbors: the web
+# timeline (file metadata) and the MCP nearby_screenshots tool (tweet text).
+_NEIGHBOR_COLUMNS = """
+            id,
+            file_path,
+            ocr_text,
+            ocr_text_clean,
+            created_at,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size,
+            tweet_time,
+            mentioned_users
+""".strip()
+
+
 def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
     """Get screenshots around a given screenshot in capture-time order.
 
     Returns (before_rows, focal_row, after_rows) of screenshot row dicts.
     """
     focal = conn.execute(
-        """
+        f"""
         SELECT
-            id,
-            file_path,
-            ocr_text,
-            created_at_local,
-            timezone,
-            width,
-            height,
-            file_size,
-            created_at
+            {_NEIGHBOR_COLUMNS}
         FROM screenshots
         WHERE id = %(id)s
         """,
@@ -292,16 +302,9 @@ def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
         return [], focal, []
 
     before_rows = conn.execute(
-        """
+        f"""
         SELECT
-            id,
-            file_path,
-            ocr_text,
-            created_at_local,
-            timezone,
-            width,
-            height,
-            file_size
+            {_NEIGHBOR_COLUMNS}
         FROM screenshots
         WHERE (created_at, id) < (%(ts)s, %(id)s)
           AND created_at IS NOT NULL
@@ -316,16 +319,9 @@ def get_timeline_neighbors(conn, screenshot_id, before=1, after=1):
     ).fetchall()
 
     after_rows = conn.execute(
-        """
+        f"""
         SELECT
-            id,
-            file_path,
-            ocr_text,
-            created_at_local,
-            timezone,
-            width,
-            height,
-            file_size
+            {_NEIGHBOR_COLUMNS}
         FROM screenshots
         WHERE (created_at, id) > (%(ts)s, %(id)s)
           AND created_at IS NOT NULL

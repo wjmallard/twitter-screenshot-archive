@@ -1,6 +1,6 @@
 """Drill tools — get_tweet, nearby_screenshots, find_related, search_by_user, interactions."""
 
-from ..core.db import get_conn
+from ..core.db import get_conn, get_timeline_neighbors
 from ..core.minhash import query_related
 from . import server
 from .config import (
@@ -67,61 +67,16 @@ async def nearby_screenshots(
         after: Number of later screenshots to show (default 5).
     """
     with get_conn() as conn:
-        focal = conn.execute(
-            """
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users, created_at
-            FROM screenshots
-            WHERE id = %(id)s
-            """,
-            {
-                "id": id,
-            },
-        ).fetchone()
+        before_rows, focal, after_rows = get_timeline_neighbors(conn, id, before=before, after=after)
 
-        if not focal:
-            return f"No screenshot with id {id}"
+    if focal is None:
+        return f"No screenshot with id {id}"
+    if focal["created_at"] is None:
+        return _format_row(focal)
 
-        if focal["created_at"] is None:
-            return _format_row(focal)
-
-        before_rows = conn.execute(
-            """
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users
-            FROM screenshots
-            WHERE (created_at, id) < (%(ts)s, %(id)s)
-              AND created_at IS NOT NULL
-            ORDER BY created_at DESC, id DESC
-            LIMIT %(limit)s
-            """,
-            {
-                "ts": focal["created_at"],
-                "id": id,
-                "limit": before,
-            },
-        ).fetchall()
-
-        after_rows = conn.execute(
-            """
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users
-            FROM screenshots
-            WHERE (created_at, id) > (%(ts)s, %(id)s)
-              AND created_at IS NOT NULL
-            ORDER BY created_at ASC, id ASC
-            LIMIT %(limit)s
-            """,
-            {
-                "ts": focal["created_at"],
-                "id": id,
-                "limit": after,
-            },
-        ).fetchall()
-
-    lines = []
-    for row in reversed(before_rows):
-        lines.append(_format_row(row))
+    lines = [_format_row(row) for row in before_rows]
     lines.append(f">>> {_format_row(focal)} <<<")
-    for row in after_rows:
-        lines.append(_format_row(row))
+    lines.extend(_format_row(row) for row in after_rows)
 
     return "\n".join(lines)
 
