@@ -121,8 +121,20 @@ def _resolve_sort(sort, fuzzy):
     return opt[fuzzy] if isinstance(opt, dict) else opt
 
 
-def search_fulltext(conn, query, limit=50, offset=0, sort="best"):
+_FT_MATCH = (
+    "(ocr_text_tsv @@ websearch_to_tsquery('english', %(query)s)"
+    " OR description_tsv @@ websearch_to_tsquery('english', %(query)s))"
+)
+
+
+def search_fulltext(conn, query, limit=50, offset=0, sort="best", after=None, before=None):
     order = _resolve_sort(sort, "word")
+    params = {
+        "query": query,
+        "limit": limit,
+        "offset": offset,
+    }
+    where = _where_with_dates(_FT_MATCH, params, after, before)
     return conn.execute(
         f"""
         SELECT
@@ -136,31 +148,36 @@ def search_fulltext(conn, query, limit=50, offset=0, sort="best"):
             file_size,
             {_FT_SCORE} AS score
         FROM screenshots
-        WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %(query)s)
-           OR description_tsv @@ websearch_to_tsquery('english', %(query)s)
+        WHERE {where}
         ORDER BY {order}
         LIMIT %(limit)s
         OFFSET %(offset)s
         """,
-        {
-            "query": query,
-            "limit": limit,
-            "offset": offset,
-        },
+        params,
     ).fetchall()
 
 
-def search_trigram(conn, query, limit=50, offset=0, sort="best"):
-    # The CTE keeps the <<% filters on their GIN indexes; word_similarity
-    # scoring then only touches the matched rows.
+_TG_MATCH = (
+    "id IN ("
+    "SELECT id FROM screenshots WHERE %(query)s <<%% ocr_text"
+    " UNION "
+    "SELECT id FROM screenshots WHERE %(query)s <<%% image_description"
+    ")"
+)
+
+
+def search_trigram(conn, query, limit=50, offset=0, sort="best", after=None, before=None):
+    # The id IN (...) subquery keeps the <<% filters on their GIN indexes;
+    # word_similarity scoring then only touches the matched rows.
     order = _resolve_sort(sort, "char")
+    params = {
+        "query": query,
+        "limit": limit,
+        "offset": offset,
+    }
+    where = _where_with_dates(_TG_MATCH, params, after, before)
     return conn.execute(
         f"""
-        WITH matches AS (
-            SELECT id FROM screenshots WHERE %(query)s <<%% ocr_text
-            UNION
-            SELECT id FROM screenshots WHERE %(query)s <<%% image_description
-        )
         SELECT
             id,
             file_path,
@@ -172,16 +189,12 @@ def search_trigram(conn, query, limit=50, offset=0, sort="best"):
             file_size,
             {_TG_SCORE} AS score
         FROM screenshots
-        WHERE id IN (SELECT id FROM matches)
+        WHERE {where}
         ORDER BY {order}
         LIMIT %(limit)s
         OFFSET %(offset)s
         """,
-        {
-            "query": query,
-            "limit": limit,
-            "offset": offset,
-        },
+        params,
     ).fetchall()
 
 
@@ -191,8 +204,29 @@ def _like_pattern(query):
     return f"%{escaped}%"
 
 
-def search_exact(conn, query, limit=50, offset=0, sort="best"):
+def _where_with_dates(base, params, after, before):
+    """Extend a WHERE clause with optional capture-date bounds."""
+    conditions = [base]
+    if after:
+        conditions.append("created_at >= %(after)s::date")
+        params["after"] = after
+    if before:
+        conditions.append("created_at < %(before)s::date")
+        params["before"] = before
+    return " AND ".join(conditions)
+
+
+_EXACT_MATCH = "(ocr_text ILIKE %(pattern)s OR image_description ILIKE %(pattern)s)"
+
+
+def search_exact(conn, query, limit=50, offset=0, sort="best", after=None, before=None):
     order = _resolve_sort(sort, "none")
+    params = {
+        "pattern": _like_pattern(query),
+        "limit": limit,
+        "offset": offset,
+    }
+    where = _where_with_dates(_EXACT_MATCH, params, after, before)
     return conn.execute(
         f"""
         SELECT
@@ -206,63 +240,59 @@ def search_exact(conn, query, limit=50, offset=0, sort="best"):
             file_size,
             1.0 AS score
         FROM screenshots
-        WHERE ocr_text ILIKE %(pattern)s
-           OR image_description ILIKE %(pattern)s
+        WHERE {where}
         ORDER BY {order}
         LIMIT %(limit)s
         OFFSET %(offset)s
         """,
-        {
-            "pattern": _like_pattern(query),
-            "limit": limit,
-            "offset": offset,
-        },
+        params,
     ).fetchall()
 
 
-def count_fulltext(conn, query):
+def count_fulltext(conn, query, after=None, before=None):
+    params = {
+        "query": query,
+    }
+    where = _where_with_dates(_FT_MATCH, params, after, before)
     row = conn.execute(
-        """
+        f"""
         SELECT count(*)
         FROM screenshots
-        WHERE ocr_text_tsv @@ websearch_to_tsquery('english', %(query)s)
-           OR description_tsv @@ websearch_to_tsquery('english', %(query)s)
+        WHERE {where}
         """,
-        {
-            "query": query,
-        },
+        params,
     ).fetchone()
     return row["count"]
 
 
-def count_trigram(conn, query):
+def count_trigram(conn, query, after=None, before=None):
+    params = {
+        "query": query,
+    }
+    where = _where_with_dates(_TG_MATCH, params, after, before)
     row = conn.execute(
-        """
+        f"""
         SELECT count(*)
-        FROM (
-            SELECT id FROM screenshots WHERE %(query)s <<%% ocr_text
-            UNION
-            SELECT id FROM screenshots WHERE %(query)s <<%% image_description
-        ) AS matches
+        FROM screenshots
+        WHERE {where}
         """,
-        {
-            "query": query,
-        },
+        params,
     ).fetchone()
     return row["count"]
 
 
-def count_exact(conn, query):
+def count_exact(conn, query, after=None, before=None):
+    params = {
+        "pattern": _like_pattern(query),
+    }
+    where = _where_with_dates(_EXACT_MATCH, params, after, before)
     row = conn.execute(
-        """
+        f"""
         SELECT count(*)
         FROM screenshots
-        WHERE ocr_text ILIKE %(pattern)s
-           OR image_description ILIKE %(pattern)s
+        WHERE {where}
         """,
-        {
-            "pattern": _like_pattern(query),
-        },
+        params,
     ).fetchone()
     return row["count"]
 

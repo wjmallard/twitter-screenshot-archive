@@ -6,6 +6,7 @@ h1 { margin-bottom: 16px; color: #000; }
 .search-bar input[type=text] { width: 400px; padding: 8px 12px; font-size: 16px; background: #fff; color: #1a1a1a; border: 1px solid #d0d7de; border-radius: 6px; }
 .search-bar button { padding: 8px 16px; font-size: 16px; background: #238636; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
 .controls-row label { margin-left: 12px; cursor: pointer; font-size: 14px; }
+.controls-row input[type=date] { margin-left: 8px; padding: 2px 6px; font-size: 13px; background: #fff; color: #1a1a1a; border: 1px solid #d0d7de; border-radius: 4px; }
 .label-group { color: #656d76; font-weight: 600; }
 .label-group.divider { margin-left: 14px; padding-left: 16px; border-left: 1px solid #d0d7de; }
 .stats { color: #656d76; margin-bottom: 16px; font-size: 14px; }
@@ -67,6 +68,7 @@ h1 { margin-bottom: 16px; color: #000; }
     body { background: #0d1117; color: #c9d1d9; }
     h1 { color: #f0f6fc; }
     .search-bar input[type=text] { background: #161b22; color: #c9d1d9; border-color: #30363d; }
+    .controls-row input[type=date] { background: #161b22; color: #c9d1d9; border-color: #30363d; color-scheme: dark; }
     .stats { color: #8b949e; }
     .result { background: #161b22; border-color: #30363d; }
     .date { color: #f0f6fc; }

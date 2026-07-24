@@ -66,6 +66,8 @@ def index():
     q = request.args.get("q", "").strip()
     fuzzy = request.args.get("fuzzy", "word")
     sort = request.args.get("sort", "best")
+    after = request.args.get("after", "").strip()
+    before = request.args.get("before", "").strip()
     page = request.args.get("page", 1, type=int)
     offset = (page - 1) * PER_PAGE
     results = []
@@ -74,14 +76,14 @@ def index():
     if q:
         with get_conn() as conn:
             if fuzzy == "char":
-                rows = search_trigram(conn, q, limit=PER_PAGE, offset=offset, sort=sort)
-                total_results = count_trigram(conn, q)
+                rows = search_trigram(conn, q, limit=PER_PAGE, offset=offset, sort=sort, after=after, before=before)
+                total_results = count_trigram(conn, q, after=after, before=before)
             elif fuzzy == "none":
-                rows = search_exact(conn, q, limit=PER_PAGE, offset=offset, sort=sort)
-                total_results = count_exact(conn, q)
+                rows = search_exact(conn, q, limit=PER_PAGE, offset=offset, sort=sort, after=after, before=before)
+                total_results = count_exact(conn, q, after=after, before=before)
             else:
-                rows = search_fulltext(conn, q, limit=PER_PAGE, offset=offset, sort=sort)
-                total_results = count_fulltext(conn, q)
+                rows = search_fulltext(conn, q, limit=PER_PAGE, offset=offset, sort=sort, after=after, before=before)
+                total_results = count_fulltext(conn, q, after=after, before=before)
             results.extend(_format_screenshot(row) for row in rows)
 
     total_pages = (total_results + PER_PAGE - 1) // PER_PAGE if total_results else 0
@@ -94,6 +96,8 @@ def index():
         q=q,
         fuzzy=fuzzy,
         sort=sort,
+        after=after,
+        before=before,
         page=page,
         total_pages=total_pages,
         results=results,

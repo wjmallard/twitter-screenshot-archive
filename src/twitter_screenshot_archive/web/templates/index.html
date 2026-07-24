@@ -22,18 +22,22 @@
             <label><input type="radio" name="sort" value="strongest" {{ "checked" if sort == "strongest" }}> Strongest</label>
             <label><input type="radio" name="sort" value="newest" {{ "checked" if sort == "newest" }}> Newest</label>
             <label><input type="radio" name="sort" value="oldest" {{ "checked" if sort == "oldest" }}> Oldest</label>
+            <span class="label-group divider">From:</span>
+            <input type="date" name="after" value="{{ after }}">
+            <span class="label-group">To:</span>
+            <input type="date" name="before" value="{{ before }}">
         </div>
     </form>
     <div class="stats">{{ "{:,}".format(total_indexed) }} screenshots indexed{% if q %} &mdash; {{ "{:,}".format(total_results) }} results for &ldquo;{{ q }}&rdquo;{% endif %}</div>
     {% if pages %}
     <div class="pagination">
-        {% if page > 1 %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, page=page - 1) }}">&laquo;</a>{% else %}<span class="disabled">&laquo;</span>{% endif %}
+        {% if page > 1 %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, after=after or none, before=before or none, page=page - 1) }}">&laquo;</a>{% else %}<span class="disabled">&laquo;</span>{% endif %}
         {% for p in pages %}
             {% if p is none %}<span class="ellipsis">&hellip;</span>
             {% elif p == page %}<span class="current">{{ p }}</span>
-            {% else %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, page=p) }}">{{ p }}</a>{% endif %}
+            {% else %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, after=after or none, before=before or none, page=p) }}">{{ p }}</a>{% endif %}
         {% endfor %}
-        {% if page < total_pages %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, page=page + 1) }}">&raquo;</a>{% else %}<span class="disabled">&raquo;</span>{% endif %}
+        {% if page < total_pages %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, after=after or none, before=before or none, page=page + 1) }}">&raquo;</a>{% else %}<span class="disabled">&raquo;</span>{% endif %}
     </div>
     {% endif %}
     {% for r in results %}
