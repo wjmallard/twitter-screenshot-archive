@@ -13,11 +13,6 @@ from tqdm import tqdm
 from ..core.db import get_conn
 from .config import VLM_MAX_TOKENS, VLM_MODEL_ID, VLM_REPETITION_PENALTY
 
-_VALID_TYPES = {
-    "twitter_screenshot",
-    "downloaded_content",
-}
-
 _PROMPT = """\
 Parse this image. If it contains tweets, transcribe each tweet top to bottom as:
 @handle [timestamp]: "verbatim tweet text"
@@ -114,7 +109,7 @@ def backfill_descriptions():
                         f"\nWarning: Failed on id {row_id}: {exc}",
                         file=sys.stderr,
                     )
-                    image_type = "other"
+                    image_type = None
                     description = f"[error: {exc}]"
 
                 conn.execute(
