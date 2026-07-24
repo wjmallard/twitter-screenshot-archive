@@ -1,5 +1,16 @@
 """MCP server for the Twitter screenshot archive."""
 
-from .server import main
+import sys
 
-__all__ = ["main"]
+
+def main():
+    try:
+        from .server import main as _main
+    except ImportError:
+        print(
+            "Error: MCP dependencies are not installed.\n"
+            "Install the mcp extra:  uv sync --extra mcp",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    _main()

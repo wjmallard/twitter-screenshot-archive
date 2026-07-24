@@ -17,7 +17,7 @@ register_heif_opener()
 
 from . import config
 from .dates import parse_tz_offset, extract_tweet_time
-from .db import get_conn, images_in_db, upsert_screenshot
+from .db import check_db, get_conn, images_in_db, upsert_screenshot
 from .minhash import compute_signature
 from .cleaning import clean_ocr_text
 from .usernames import extract_usernames
@@ -144,7 +144,6 @@ def ingest(root: Path, workers: int = config.TESSERACT_WORKERS):
 
 
 def main():
-    from .db import check_db
     check_db()
     ingest(config.SCREENSHOT_DIR)
 

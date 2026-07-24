@@ -9,7 +9,7 @@ def main():
     except ImportError:
         print(
             "Error: Flask is not installed.\n"
-            "Install the web extra:  uv pip install -e '.[web]'",
+            "Install the web extra:  uv sync --extra web",
             file=sys.stderr,
         )
         sys.exit(1)

@@ -14,7 +14,7 @@ register_heif_opener()
 
 from ..core import config
 from ..core.db import (
-    get_conn, search_fulltext, search_trigram, search_exact,
+    check_db, get_conn, search_fulltext, search_trigram, search_exact,
     count_fulltext, count_trigram, count_exact, count_screenshots,
     get_screenshots_by_ids, get_timeline_neighbors,
 )
@@ -184,7 +184,6 @@ def timeline(screenshot_id):
 
 
 def main():
-    from ..core.db import check_db
     check_db()
 
     parser = argparse.ArgumentParser(description="Twitter Archive web UI")

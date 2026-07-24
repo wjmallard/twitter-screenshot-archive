@@ -8,6 +8,7 @@ from datetime import datetime
 from mcp.server.fastmcp import FastMCP
 
 from ..core.config import PROJECT_ROOT
+from ..core.db import check_db
 from ..core.minhash import load_or_build_lsh_index
 from .embedding import load_model
 
@@ -126,7 +127,6 @@ mcp = FastMCP(
 
 
 def main():
-    from ..core.db import check_db
     check_db()
 
     # Import tool modules to trigger @mcp.tool() registration
