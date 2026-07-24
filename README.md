@@ -9,6 +9,7 @@ Full-text search and topic discovery over a personal archive of Twitter screensh
 3. **MCP Server** (optional) — Semantic search, topic clustering, and discourse tracing via in-process MLX embeddings, exposed as MCP tools for LLM chat models (e.g. Claude, Qwen)
 4. **Embed** (optional) — Standalone embedding backfill using Qwen3-Embedding on Apple Silicon via MLX
 5. **Describe** (optional) — VLM image descriptions using Qwen2.5-VL-7B, classifying and transcribing tweet screenshots
+6. **Import & Match** (optional) — Load a Twitter data export and link screenshots to their exact tweets
 
 Dates are parsed from JSON sidecars with EXIF fallback.
 
@@ -78,12 +79,17 @@ uv run tsa-ingest
 uv run tsa-web
 ```
 
-Runs a local webserver at `http://localhost:5000`.
+Runs a local webserver at `http://localhost:5000`. Pass `--debug` for Flask
+debug mode and auto-reload.
 
 **Fuzzy search modes:**
 - **Word** (default) — full-text search with stemming. "running" matches "run". Supports boolean syntax.
 - **Char** — character-level trigram matching. Catches typos and OCR errors.
 - **None** — exact substring match (case-insensitive).
+- **Semantic** — meaning-based search over MLX embeddings. Shown only when the `mcp` extra is installed.
+
+All modes also match against VLM image descriptions when present, and results
+can be restricted with the From/To capture-date filters.
 
 **Sort options:**
 - **Best** (default) — relevance × recency
@@ -144,7 +150,7 @@ Fourteen tools organized into three tiers:
 - **`similar_users(handle, after?, before?, limit?, k?)`** — Who talks about similar things. Per-tweet nearest neighbors: for each tweet mentioning the handle, finds the K nearest tweets that don't mention that handle, aggregates users from those neighbors. Handles users with diverse interests without blurring.
 
 **Drill** — follow threads once you have a foothold:
-- **`get_tweet(id)`** — Full OCR text of a specific screenshot.
+- **`get_tweet(id)`** — Full OCR text of a specific screenshot, plus the VLM transcription and the exact text of matched tweets from your Twitter export.
 - **`find_related(id, limit?)`** — Lexically similar tweets via MinHash. Finds other parts of the same thread, conversation, or reply chain.
 - **`nearby_screenshots(id, before?, after?)`** — Screenshots captured around the same time as a given tweet. Not a search — just chronological neighbors. Requires a known ID from another tool.
 - **`search_by_user(handle, limit?, offset?, after?, before?, sort?)`** — Tweets mentioning a specific @user. Sort by "newest" (default) or "oldest".
@@ -172,6 +178,18 @@ Edit `mcp_prompt.txt` with your interests, terminology, and preferences. This is
   }
 }
 ```
+
+### Twitter Export Import (optional)
+
+```bash
+uv run tsa-import ~/path/to/twitter-export
+uv run tsa-match
+```
+
+`tsa-import` loads likes and tweets from a Twitter data export (the
+`window.YTD.*` JS files) into Postgres. `tsa-match` links screenshots to
+exported tweets by word 3-gram seeding plus fuzzy scoring, then backfills
+exact tweet timestamps from the matched tweets' snowflake IDs.
 
 ## Project Structure
 
