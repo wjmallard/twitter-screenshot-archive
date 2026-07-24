@@ -27,25 +27,25 @@
     <div class="stats">{{ "{:,}".format(total_indexed) }} screenshots indexed{% if q %} &mdash; {{ "{:,}".format(total_results) }} results for &ldquo;{{ q }}&rdquo;{% endif %}</div>
     {% if pages %}
     <div class="pagination">
-        {% if page > 1 %}<a href="/?q={{ q }}&fuzzy={{ fuzzy }}&sort={{ sort }}&page={{ page - 1 }}">&laquo;</a>{% else %}<span class="disabled">&laquo;</span>{% endif %}
+        {% if page > 1 %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, page=page - 1) }}">&laquo;</a>{% else %}<span class="disabled">&laquo;</span>{% endif %}
         {% for p in pages %}
             {% if p is none %}<span class="ellipsis">&hellip;</span>
             {% elif p == page %}<span class="current">{{ p }}</span>
-            {% else %}<a href="/?q={{ q }}&fuzzy={{ fuzzy }}&sort={{ sort }}&page={{ p }}">{{ p }}</a>{% endif %}
+            {% else %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, page=p) }}">{{ p }}</a>{% endif %}
         {% endfor %}
-        {% if page < total_pages %}<a href="/?q={{ q }}&fuzzy={{ fuzzy }}&sort={{ sort }}&page={{ page + 1 }}">&raquo;</a>{% else %}<span class="disabled">&raquo;</span>{% endif %}
+        {% if page < total_pages %}<a href="{{ url_for('index', q=q, fuzzy=fuzzy, sort=sort, page=page + 1) }}">&raquo;</a>{% else %}<span class="disabled">&raquo;</span>{% endif %}
     </div>
     {% endif %}
     {% for r in results %}
     <div class="result">
         <div class="thumb">
             <a href="#" class="lightbox-link" data-path="{{ r.file_path }}">
-                <img src="/image?path={{ r.file_path }}&thumb=1" loading="lazy" alt="{{ r.name }}">
+                <img src="{{ url_for('serve_image', path=r.file_path, thumb=1) }}" loading="lazy" alt="{{ r.name }}">
             </a>
         </div>
         <div class="info">
             <div class="date">{{ r.date }}</div>
-            <div class="meta">score: {{ "%.3f"|format(r.score) }} &mdash; <a href="/image?path={{ r.file_path }}" download class="action-link">download</a> &mdash; <a href="#" class="related-link" data-id="{{ r.id }}">related</a> &mdash; <a href="#" class="timeline-link" data-id="{{ r.id }}">timeline</a></div>
+            <div class="meta">score: {{ "%.3f"|format(r.score) }} &mdash; <a href="{{ url_for('serve_image', path=r.file_path) }}" download class="action-link">download</a> &mdash; <a href="#" class="related-link" data-id="{{ r.id }}">related</a> &mdash; <a href="#" class="timeline-link" data-id="{{ r.id }}">timeline</a></div>
             <div class="meta file-meta">{{ r.name }} &mdash; {{ r.width }}x{{ r.height }}{% if r.file_size %} &mdash; {{ r.file_size }}{% endif %}</div>
             <pre class="ocr">{{ r.ocr_text }}</pre>
         </div>
