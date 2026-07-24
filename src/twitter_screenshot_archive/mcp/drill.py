@@ -16,7 +16,7 @@ mcp = server.mcp
 
 
 @mcp.tool()
-async def get_tweet(id: int) -> str:
+def get_tweet(id: int) -> str:
     """Get the full OCR text of a specific tweet by ID."""
     with get_conn() as conn:
         row = conn.execute(
@@ -57,7 +57,7 @@ def _format_row(row) -> str:
 
 
 @mcp.tool()
-async def nearby_screenshots(
+def nearby_screenshots(
     id: int,
     before: int = 5,
     after: int = 5,
@@ -86,7 +86,7 @@ async def nearby_screenshots(
 
 
 @mcp.tool()
-async def find_related(id: int, limit: int = 10) -> str:
+def find_related(id: int, limit: int = 10) -> str:
     """Find tweets with similar wording to a specific tweet. Use to find other
     parts of the same thread, conversation, or reply chain.
 
@@ -135,7 +135,7 @@ async def find_related(id: int, limit: int = 10) -> str:
 
 
 @mcp.tool()
-async def search_by_user(
+def search_by_user(
     handle: str,
     limit: int = 20,
     offset: int = 0,
@@ -223,7 +223,7 @@ async def search_by_user(
 
 
 @mcp.tool()
-async def interactions(
+def interactions(
     user1: str,
     user2: str,
     limit: int = 20,

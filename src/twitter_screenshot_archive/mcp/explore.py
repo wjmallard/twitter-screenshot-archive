@@ -45,7 +45,7 @@ def _pick_snippets(medoid: dict, members: list[dict], max_snippets: int) -> list
 
 
 @mcp.tool()
-async def summarize_period(
+def summarize_period(
     after: str | None = None,
     before: str | None = None,
     topics: list[str] | None = None,
@@ -68,7 +68,7 @@ async def summarize_period(
     if not after and not before and not topics and not users:
         return "Error: provide at least one of after/before date range, topics, or users."
 
-    rows = await _fetch_relevant(after=after, before=before, topics=topics, users=users)
+    rows = _fetch_relevant(after=after, before=before, topics=topics, users=users)
     if not rows:
         return "No tweets found in the specified range."
 
@@ -103,7 +103,7 @@ async def summarize_period(
 
 
 @mcp.tool()
-async def list_topics(
+def list_topics(
     after: str | None = None,
     before: str | None = None,
     users: list[str] | None = None,
@@ -122,7 +122,7 @@ async def list_topics(
     if not after and not before and not users:
         return "Error: provide at least one of after/before date range or users."
 
-    rows = await _fetch_relevant(after=after, before=before, users=users)
+    rows = _fetch_relevant(after=after, before=before, users=users)
     if not rows:
         return "No tweets found in the specified range."
 
@@ -141,7 +141,7 @@ async def list_topics(
 
 
 @mcp.tool()
-async def top_users(
+def top_users(
     query: str | None = None,
     after: str | None = None,
     before: str | None = None,
@@ -160,7 +160,7 @@ async def top_users(
     if not after and not before and not topics:
         return "Error: provide at least a query or a date range."
 
-    rows = await _fetch_relevant(after=after, before=before, topics=topics)
+    rows = _fetch_relevant(after=after, before=before, topics=topics)
     if not rows:
         return "No tweets found."
 
@@ -189,7 +189,7 @@ _SIMILAR_USERS_K = 5
 
 
 @mcp.tool()
-async def similar_users(
+def similar_users(
     handle: str,
     after: str | None = None,
     before: str | None = None,

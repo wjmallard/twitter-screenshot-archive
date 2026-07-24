@@ -19,7 +19,7 @@ _GRANULARITY_LABELS = {
 
 
 @mcp.tool()
-async def tweet_activity(
+def tweet_activity(
     query: str | None = None,
     keywords: str | None = None,
     users: list[str] | None = None,

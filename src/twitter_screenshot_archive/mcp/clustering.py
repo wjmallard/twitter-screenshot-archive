@@ -35,7 +35,7 @@ def _parse_rows(db_rows: list) -> list[dict]:
     return rows
 
 
-async def _fetch_relevant(
+def _fetch_relevant(
     after: str | None = None,
     before: str | None = None,
     topics: list[str] | None = None,

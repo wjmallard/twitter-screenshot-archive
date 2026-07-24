@@ -8,7 +8,7 @@ from .utils import add_time_filter
 
 
 @mcp.tool()
-async def now() -> str:
+def now() -> str:
     """Get the current date and time. Use this to resolve relative
     references like 'last week' or 'yesterday'."""
     utc = datetime.now(timezone.utc)
@@ -21,7 +21,7 @@ async def now() -> str:
 
 
 @mcp.tool()
-async def archive_range() -> str:
+def archive_range() -> str:
     """Get the first and last dates in the archive."""
     with get_conn() as conn:
         row = conn.execute(
@@ -43,7 +43,7 @@ async def archive_range() -> str:
 
 
 @mcp.tool()
-async def count_screenshots(
+def count_screenshots(
     after: str | None = None,
     before: str | None = None,
 ) -> str:

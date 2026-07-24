@@ -32,7 +32,7 @@ def _format_result(index: int, total: int, row) -> str:
 
 
 @mcp.tool()
-async def search_tweets(
+def search_tweets(
     query: str | None = None,
     keywords: str | None = None,
     limit: int = DEFAULT_SEARCH_LIMIT,
