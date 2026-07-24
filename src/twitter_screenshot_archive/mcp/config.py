@@ -1,16 +1,6 @@
 """MCP-specific configuration from config.yaml."""
 
-from twitter_screenshot_archive.core.config import _PROJECT_ROOT
-
-import yaml
-
-_CONFIG_PATH = _PROJECT_ROOT / "config.yaml"
-
-try:
-    with open(_CONFIG_PATH) as f:
-        _raw = yaml.safe_load(f) or {}
-except FileNotFoundError:
-    _raw = {}
+from ..core.config import RAW as _raw
 
 EMBEDDING_MODEL_ID = _raw.get(
     "embedding_model_id", "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"

@@ -4,15 +4,14 @@ import signal
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
-from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
+from ..core.config import PROJECT_ROOT
 from ..core.minhash import load_or_build_lsh_index
 from .embedding import load_model
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-_PROMPT_FILE = _PROJECT_ROOT / "mcp_prompt.txt"
+_PROMPT_FILE = PROJECT_ROOT / "mcp_prompt.txt"
 
 _WORKFLOW_GUIDANCE = """\
 You have access to a Twitter screenshot archive — an OCR-indexed personal
