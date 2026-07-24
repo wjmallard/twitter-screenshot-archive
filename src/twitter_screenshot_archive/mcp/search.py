@@ -110,15 +110,15 @@ def search_tweets(
             order_by = "ts_rank(ocr_text_tsv, to_tsquery('english', %(keywords)s)) DESC"
 
     with get_conn() as conn:
-        total = conn.execute(
-            f"SELECT count(*) FROM screenshots WHERE {where}",
-            params,
-        ).fetchone()["count"]
-
         rows = conn.execute(
             f"""
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users
-                   {select_extra}
+            SELECT
+                id,
+                ocr_text_clean,
+                tweet_time,
+                mentioned_users,
+                count(*) OVER () AS total_count
+                {select_extra}
             FROM screenshots
             WHERE {where}
             ORDER BY {order_by}
@@ -131,6 +131,7 @@ def search_tweets(
     if not rows:
         return "No results found."
 
+    total = rows[0]["total_count"]
     sort_label = "newest first" if sort == "chronological" else "best match first"
     start = offset + 1
     end = offset + len(rows)
