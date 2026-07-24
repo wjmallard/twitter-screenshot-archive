@@ -1,9 +1,6 @@
 """In-process MLX embedding engine and startup backfill."""
 
-import logging
 import sys
-
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
 import mlx.core as mx
 from mlx_lm import load as mlx_load

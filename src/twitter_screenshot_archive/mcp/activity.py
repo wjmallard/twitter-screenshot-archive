@@ -73,17 +73,17 @@ def tweet_activity(
     where = " AND ".join(conditions)
 
     # Build SELECT columns
-    bucket = f"date_trunc(%(granularity)s, COALESCE(tweet_time, created_at))"
+    bucket = "date_trunc(%(granularity)s, COALESCE(tweet_time, created_at))"
     params["granularity"] = granularity
 
     select_cols = [f"{bucket} AS bucket", "count(*) AS tweet_count"]
     if query:
         select_cols.append(
-            f"MAX(1 - (embedding <=> %(vec)s::vector)) AS max_sim"
+            "max(1 - (embedding <=> %(vec)s::vector)) AS max_sim"
         )
         if include_mean:
             select_cols.append(
-                f"AVG(1 - (embedding <=> %(vec)s::vector)) AS mean_sim"
+                "avg(1 - (embedding <=> %(vec)s::vector)) AS mean_sim"
             )
 
     select = ", ".join(select_cols)

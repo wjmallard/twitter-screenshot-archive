@@ -60,8 +60,8 @@ def _fetch_relevant(
     if topics:
         topic_embeddings = embed_texts(topics)
 
-        # Build UNION ALL across topic vectors — each branch gets its own
-        # HNSW index scan for coarse pre-filtering
+        # Build a UNION across topic vectors — one coarse pre-filter branch
+        # per topic; UNION dedups rows that match multiple topics
         date_where = (" AND " + " AND ".join(date_conditions)) if date_conditions else ""
         params: dict = dict(date_params)
         params["floor"] = COARSE_SIMILARITY_FLOOR

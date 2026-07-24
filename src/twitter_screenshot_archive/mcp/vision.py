@@ -1,10 +1,7 @@
 """VLM image description engine and backfill (tsa-describe)."""
 
-import logging
 import re
 import sys
-
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
 from mlx_vlm import generate, load
 from mlx_vlm.prompt_utils import apply_chat_template
@@ -51,11 +48,6 @@ def _parse_type(text: str) -> str:
     return "downloaded_content"
 
 
-def _parse_description(text: str) -> str:
-    """Clean up VLM output into the stored description."""
-    return text.strip()
-
-
 def describe_image(image_path: str) -> tuple[str, str]:
     """Run the VLM on a single image.
 
@@ -75,7 +67,7 @@ def describe_image(image_path: str) -> tuple[str, str]:
         prefill_step_size=None,
     )
     raw = result.text
-    return _parse_type(raw), _parse_description(raw)
+    return _parse_type(raw), raw.strip()
 
 
 def backfill_descriptions():
