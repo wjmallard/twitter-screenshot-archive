@@ -8,7 +8,9 @@ flask_port: 5000
 # MCP semantic search (optional — defaults shown)
 embedding_model_id: mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ
 embedding_batch_size: 128
-embedding_search_limit: 50
+embedding_search_limit: 10
+search_similarity_floor: 0.4
+snippet_max_chars_mcp: 500
 
 # Clustering (optional — defaults shown)
 coarse_similarity_floor: 0.15
@@ -16,6 +18,8 @@ topic_sim_threshold_pct: 0.30
 pca_n_components: 15
 time_weight: 2.0
 cluster_min_size: 3
+# cluster_min_samples defaults to the adaptive minimum cluster size
+summarize_snippets: 0
 
 # VLM image descriptions (optional — defaults shown)
 vlm_model_id: mlx-community/Qwen2.5-VL-7B-Instruct-4bit
