@@ -3,7 +3,7 @@
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
 import cv2
@@ -24,6 +24,18 @@ from .usernames import extract_usernames
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".heic", ".tiff", ".bmp"}
 
 
+def _dates_from_strings(dt_str, offset_str):
+    """Convert EXIF-style date/offset strings to (utc, local_naive, tz_offset_str)."""
+    if not dt_str:
+        return None, None, None
+    local_naive = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S")
+    if not offset_str:
+        return None, local_naive, None
+    tz = parse_tz_offset(offset_str)
+    utc = local_naive.replace(tzinfo=tz).astimezone(timezone.utc)
+    return utc, local_naive, offset_str
+
+
 def parse_dates_from_sidecar(image_path: Path) -> tuple[datetime | None, datetime | None, str | None]:
     """Parse dates from JSON sidecar. Returns (utc, local_naive, tz_offset_str)."""
     sidecar = Path(str(image_path) + ".json")
@@ -33,17 +45,10 @@ def parse_dates_from_sidecar(image_path: Path) -> tuple[datetime | None, datetim
         data = json.loads(sidecar.read_text())
         if isinstance(data, list):
             data = data[0]
-        dt_str = data.get("EXIF:DateTimeOriginal")
-        offset_str = data.get("EXIF:OffsetTimeOriginal")
-        if not dt_str:
-            return None, None, None
-        local_naive = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S")
-        if offset_str:
-            tz = parse_tz_offset(offset_str)
-            local_aware = local_naive.replace(tzinfo=tz)
-            utc = local_aware.astimezone(timezone.utc)
-            return utc, local_naive, offset_str
-        return None, local_naive, None
+        return _dates_from_strings(
+            data.get("EXIF:DateTimeOriginal"),
+            data.get("EXIF:OffsetTimeOriginal"),
+        )
     except Exception:
         return None, None, None
 
@@ -55,20 +60,9 @@ def parse_dates_from_exif(img: Image.Image) -> tuple[datetime | None, datetime |
         if not exif:
             return None, None, None
         # 36867 = DateTimeOriginal, 36881 = OffsetTimeOriginal
-        dt_str = exif.get(36867)
-        offset_str = exif.get(36881)
-        if not dt_str:
-            return None, None, None
-        local_naive = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S")
-        if offset_str:
-            tz = parse_tz_offset(offset_str)
-            local_aware = local_naive.replace(tzinfo=tz)
-            utc = local_aware.astimezone(timezone.utc)
-            return utc, local_naive, offset_str
-        return None, local_naive, None
+        return _dates_from_strings(exif.get(36867), exif.get(36881))
     except Exception:
         return None, None, None
-
 
 
 def preprocess(img: Image.Image) -> Image.Image:
