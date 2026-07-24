@@ -5,9 +5,14 @@ import mimetypes
 import os
 import pickle
 import time
+from io import BytesIO
 from pathlib import Path
 
 from flask import Flask, abort, jsonify, render_template, request, send_file
+from PIL import Image
+from pillow_heif import register_heif_opener
+
+register_heif_opener()
 
 from ..core import config
 from ..core.db import (
@@ -160,13 +165,12 @@ def serve_image():
         abort(404)
 
     if request.args.get("thumb"):
-        from PIL import Image
-        from io import BytesIO
-
         img = Image.open(p)
         img.thumbnail((800, 800))
-        buf = BytesIO()
         fmt = "PNG" if p.suffix.lower() == ".png" else "JPEG"
+        if fmt == "JPEG" and img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        buf = BytesIO()
         img.save(buf, format=fmt)
         buf.seek(0)
         mime = "image/png" if fmt == "PNG" else "image/jpeg"
