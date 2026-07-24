@@ -107,8 +107,18 @@ _TG_SCORE = (
 )
 
 SORT_OPTIONS = {
-    "best": {"word": f"{_FT_SCORE} * {_DECAY} DESC", "char": f"{_TG_SCORE} * {_DECAY} DESC", "none": f"{_DECAY} DESC"},
-    "strongest": {"word": f"{_FT_SCORE} DESC", "char": f"{_TG_SCORE} DESC", "none": "created_at DESC NULLS LAST"},
+    "best": {
+        "char": f"{_TG_SCORE} * {_DECAY} DESC",
+        "none": f"{_DECAY} DESC",
+        "semantic": f"(1 - (embedding <=> %(vec)s::vector)) * {_DECAY} DESC",
+        "word": f"{_FT_SCORE} * {_DECAY} DESC",
+    },
+    "strongest": {
+        "char": f"{_TG_SCORE} DESC",
+        "none": "created_at DESC NULLS LAST",
+        "semantic": "embedding <=> %(vec)s::vector ASC",
+        "word": f"{_FT_SCORE} DESC",
+    },
     "newest": "created_at DESC NULLS LAST",
     "oldest": "created_at ASC NULLS LAST",
 }
@@ -286,6 +296,60 @@ def count_exact(conn, query, after=None, before=None):
         "pattern": _like_pattern(query),
     }
     where = _where_with_dates(_EXACT_MATCH, params, after, before)
+    row = conn.execute(
+        f"""
+        SELECT count(*)
+        FROM screenshots
+        WHERE {where}
+        """,
+        params,
+    ).fetchone()
+    return row["count"]
+
+
+_SEMANTIC_MATCH = (
+    "(embedding IS NOT NULL"
+    " AND 1 - (embedding <=> %(vec)s::vector) >= %(min_score)s)"
+)
+
+
+def search_semantic(conn, query_vec, limit=50, offset=0, sort="best", min_score=0.4, after=None, before=None):
+    order = _resolve_sort(sort, "semantic")
+    params = {
+        "vec": query_vec,
+        "min_score": min_score,
+        "limit": limit,
+        "offset": offset,
+    }
+    where = _where_with_dates(_SEMANTIC_MATCH, params, after, before)
+    return conn.execute(
+        f"""
+        SELECT
+            id,
+            file_path,
+            ocr_text,
+            created_at_local,
+            timezone,
+            width,
+            height,
+            file_size,
+            1 - (embedding <=> %(vec)s::vector) AS score
+        FROM screenshots
+        WHERE {where}
+        ORDER BY {order}
+        LIMIT %(limit)s
+        OFFSET %(offset)s
+        """,
+        params,
+    ).fetchall()
+
+
+def count_semantic(conn, query_vec, min_score=0.4, after=None, before=None):
+    params = {
+        "vec": query_vec,
+        "min_score": min_score,
+    }
+    where = _where_with_dates(_SEMANTIC_MATCH, params, after, before)
     row = conn.execute(
         f"""
         SELECT count(*)

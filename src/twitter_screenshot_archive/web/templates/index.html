@@ -17,6 +17,7 @@
             <label><input type="radio" name="fuzzy" value="word" {{ "checked" if fuzzy == "word" }}> Word</label>
             <label><input type="radio" name="fuzzy" value="char" {{ "checked" if fuzzy == "char" }}> Char</label>
             <label><input type="radio" name="fuzzy" value="none" {{ "checked" if fuzzy == "none" }}> None</label>
+            {% if semantic_available %}<label><input type="radio" name="fuzzy" value="semantic" {{ "checked" if fuzzy == "semantic" }}> Semantic</label>{% endif %}
             <span class="label-group divider">Sort:</span>
             <label><input type="radio" name="sort" value="best" {{ "checked" if sort == "best" }}> Best</label>
             <label><input type="radio" name="sort" value="strongest" {{ "checked" if sort == "strongest" }}> Strongest</label>

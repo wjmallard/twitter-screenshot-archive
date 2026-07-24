@@ -3,6 +3,7 @@
 import argparse
 import mimetypes
 import os
+from importlib.util import find_spec
 from io import BytesIO
 from pathlib import Path
 
@@ -12,10 +13,11 @@ from pillow_heif import register_heif_opener
 
 register_heif_opener()
 
-from ..core import config
+from ..core import config, embedding
 from ..core.db import (
     check_db, get_conn, search_fulltext, search_trigram, search_exact,
-    count_fulltext, count_trigram, count_exact, count_screenshots,
+    search_semantic, count_fulltext, count_trigram, count_exact,
+    count_semantic, count_screenshots,
     get_screenshots_by_ids, get_timeline_neighbors,
 )
 from ..core.minhash import load_or_build_lsh_index, query_related
@@ -25,6 +27,11 @@ app = Flask(__name__)
 PER_PAGE = config.RESULTS_PER_PAGE
 
 _IMAGE_ROOT = config.SCREENSHOT_DIR.resolve()
+
+# Semantic search needs MLX (installed with the mcp extra); hide the
+# option when it isn't available rather than erroring.
+SEMANTIC_AVAILABLE = find_spec("mlx_lm") is not None
+SEMANTIC_MIN_SCORE = config.RAW.get("search_similarity_floor", 0.4)
 
 _lsh = None
 _minhashes = {}
@@ -81,6 +88,11 @@ def index():
             elif fuzzy == "none":
                 rows = search_exact(conn, q, limit=PER_PAGE, offset=offset, sort=sort, after=after, before=before)
                 total_results = count_exact(conn, q, after=after, before=before)
+            elif fuzzy == "semantic" and SEMANTIC_AVAILABLE:
+                embedding.ensure_model()
+                query_vec = embedding.vec_literal(embedding.embed_texts([q])[0])
+                rows = search_semantic(conn, query_vec, limit=PER_PAGE, offset=offset, sort=sort, min_score=SEMANTIC_MIN_SCORE, after=after, before=before)
+                total_results = count_semantic(conn, query_vec, min_score=SEMANTIC_MIN_SCORE, after=after, before=before)
             else:
                 rows = search_fulltext(conn, q, limit=PER_PAGE, offset=offset, sort=sort, after=after, before=before)
                 total_results = count_fulltext(conn, q, after=after, before=before)
@@ -104,6 +116,7 @@ def index():
         total_indexed=total_indexed,
         total_results=total_results,
         pages=_page_numbers(page, total_pages),
+        semantic_available=SEMANTIC_AVAILABLE,
     )
 
 
