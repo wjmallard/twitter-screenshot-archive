@@ -1,5 +1,6 @@
 """Flask search GUI for screenshot search."""
 
+import argparse
 import mimetypes
 import os
 import pickle
@@ -241,12 +242,22 @@ def timeline(screenshot_id):
 def main():
     from ..core.db import check_db
     check_db()
-    # When Flask's debug reloader is active, the parent process only monitors
-    # files and never serves requests. Skip the expensive index build there.
-    # WERKZEUG_RUN_MAIN is set to 'true' only in the child (serving) process.
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+
+    parser = argparse.ArgumentParser(description="Twitter Archive web UI")
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable Flask debug mode and auto-reload",
+    )
+    args = parser.parse_args()
+
+    # With the debug reloader active, the parent process only monitors files
+    # and never serves requests, so the index build belongs in the serving
+    # child (which has WERKZEUG_RUN_MAIN set). Without the reloader there is
+    # only one process — build directly.
+    if not args.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         _init_index()
-    app.run(debug=True, port=config.FLASK_PORT)
+    app.run(debug=args.debug, port=config.FLASK_PORT)
 
 
 if __name__ == "__main__":
