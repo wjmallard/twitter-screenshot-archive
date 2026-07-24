@@ -1,7 +1,5 @@
 """Explore tools — summarize_period, list_topics, top_users, similar_users."""
 
-import json
-
 import numpy as np
 
 from ..core.db import get_conn
@@ -10,7 +8,6 @@ from .config import (
     SNIPPET_MAX_CHARS,
     SUMMARIZE_SNIPPETS,
 )
-from .embedding import vec_literal
 from .server import mcp
 from .utils import (
     add_time_filter,
@@ -253,7 +250,8 @@ def similar_users(
 
     with get_conn() as conn:
         for source in source_rows:
-            neighbor_params["vec"] = vec_literal(json.loads(source["embedding"]))
+            # embedding::text is already a pgvector literal — pass it back as-is
+            neighbor_params["vec"] = source["embedding"]
             neighbors = conn.execute(
                 f"""
                 SELECT mentioned_users
