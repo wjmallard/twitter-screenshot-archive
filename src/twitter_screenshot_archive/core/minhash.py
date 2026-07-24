@@ -12,6 +12,7 @@ from .db import get_conn, load_all_signatures, signature_fingerprint
 
 NUM_PERM = 128
 SHINGLE_K = 3
+LSH_THRESHOLD = 0.2
 
 _CACHE_FILE = Path.home() / ".cache" / "twitter-screenshot-archive" / "lsh_index.pkl"
 
@@ -43,9 +44,6 @@ def signature_to_minhash(sig_bytes: bytes) -> MinHash:
     m = MinHash(num_perm=NUM_PERM)
     m.hashvalues = np.frombuffer(sig_bytes, dtype=np.uint64).copy()
     return m
-
-
-LSH_THRESHOLD = 0.2
 
 
 def build_lsh_index(rows):

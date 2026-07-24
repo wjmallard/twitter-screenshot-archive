@@ -85,9 +85,15 @@ def backfill_descriptions():
 
         while True:
             rows = conn.execute(
-                "SELECT id, file_path FROM screenshots "
-                "WHERE image_description IS NULL "
-                "ORDER BY id LIMIT 100",
+                """
+                SELECT
+                    id,
+                    file_path
+                FROM screenshots
+                WHERE image_description IS NULL
+                ORDER BY id
+                LIMIT 100
+                """,
             ).fetchall()
 
             if not rows:
@@ -105,10 +111,12 @@ def backfill_descriptions():
                     description = f"[error: {exc}]"
 
                 conn.execute(
-                    "UPDATE screenshots "
-                    "SET image_type = %(image_type)s, "
-                    "    image_description = %(description)s "
-                    "WHERE id = %(id)s",
+                    """
+                    UPDATE screenshots
+                    SET image_type = %(image_type)s,
+                        image_description = %(description)s
+                    WHERE id = %(id)s
+                    """,
                     {
                         "image_type": image_type,
                         "description": description,

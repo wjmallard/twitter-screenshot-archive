@@ -223,7 +223,13 @@ def similar_users(
 
     with get_conn() as conn:
         source_rows = conn.execute(
-            f"SELECT id, embedding::text FROM screenshots WHERE {source_where}",
+            f"""
+            SELECT
+                id,
+                embedding::text
+            FROM screenshots
+            WHERE {source_where}
+            """,
             params,
         ).fetchall()
 

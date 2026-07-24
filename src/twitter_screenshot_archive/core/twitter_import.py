@@ -5,12 +5,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Twitter snowflake epoch: 2010-11-04T01:42:54.657Z
-_SNOWFLAKE_EPOCH_MS = 1288834974657
-
 import orjson
 
 from .db import check_db, get_conn
+
+# Twitter snowflake epoch: 2010-11-04T01:42:54.657Z
+_SNOWFLAKE_EPOCH_MS = 1288834974657
 
 
 def _snowflake_to_datetime(snowflake_id):

@@ -3,12 +3,11 @@
 import json
 
 import numpy as np
-
-from ..core.db import get_conn
-from ..core.minhash import signature_to_minhash
 from sklearn.cluster import HDBSCAN
 from sklearn.decomposition import PCA
 
+from ..core.db import get_conn
+from ..core.minhash import signature_to_minhash
 from .config import (
     CLUSTER_MIN_SAMPLES,
     CLUSTER_MIN_SIZE,
@@ -71,12 +70,19 @@ def _fetch_relevant(
             key = f"topic_{i}"
             params[key] = vec_literal(emb)
             branches.append(
-                f"SELECT id, ocr_text_clean, tweet_time, mentioned_users, "
-                f"embedding::text, created_at, minhash_signature "
-                f"FROM screenshots "
-                f"WHERE embedding IS NOT NULL "
-                f"AND 1 - (embedding <=> %({key})s::vector) >= %(floor)s"
-                f"{date_where}"
+                f"""
+                SELECT
+                    id,
+                    ocr_text_clean,
+                    tweet_time,
+                    mentioned_users,
+                    embedding::text,
+                    created_at,
+                    minhash_signature
+                FROM screenshots
+                WHERE embedding IS NOT NULL
+                  AND 1 - (embedding <=> %({key})s::vector) >= %(floor)s{date_where}
+                """
             )
 
         sql = " UNION ".join(branches)
@@ -117,8 +123,14 @@ def _fetch_relevant(
     with get_conn() as conn:
         db_rows = conn.execute(
             f"""
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users,
-                   embedding::text, created_at, minhash_signature
+            SELECT
+                id,
+                ocr_text_clean,
+                tweet_time,
+                mentioned_users,
+                embedding::text,
+                created_at,
+                minhash_signature
             FROM screenshots
             WHERE {where}
             """,

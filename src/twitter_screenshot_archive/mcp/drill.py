@@ -21,7 +21,11 @@ def get_tweet(id: int) -> str:
     with get_conn() as conn:
         row = conn.execute(
             """
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users
+            SELECT
+                id,
+                ocr_text_clean,
+                tweet_time,
+                mentioned_users
             FROM screenshots
             WHERE id = %(id)s
             """,
@@ -105,7 +109,11 @@ def find_related(id: int, limit: int = 10) -> str:
     with get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users
+            SELECT
+                id,
+                ocr_text_clean,
+                tweet_time,
+                mentioned_users
             FROM screenshots
             WHERE id = ANY(%(ids)s)
             """,
@@ -192,7 +200,11 @@ def search_by_user(
 
         rows = conn.execute(
             f"""
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users
+            SELECT
+                id,
+                ocr_text_clean,
+                tweet_time,
+                mentioned_users
             FROM screenshots
             WHERE {where}
             ORDER BY {order_by}
@@ -265,7 +277,11 @@ def interactions(
 
         rows = conn.execute(
             f"""
-            SELECT id, ocr_text_clean, tweet_time, mentioned_users
+            SELECT
+                id,
+                ocr_text_clean,
+                tweet_time,
+                mentioned_users
             FROM screenshots
             WHERE {where}
             ORDER BY COALESCE(tweet_time, created_at) DESC

@@ -42,8 +42,14 @@ def _build_index(conn):
       ocr_map: dict[int, str]       — screenshot ID → normalized OCR text
     """
     rows = conn.execute(
-        "SELECT id, ocr_text_clean FROM screenshots "
-        "WHERE ocr_text_clean IS NOT NULL AND ocr_text_clean != ''"
+        """
+        SELECT
+            id,
+            ocr_text_clean
+        FROM screenshots
+        WHERE ocr_text_clean IS NOT NULL
+          AND ocr_text_clean != ''
+        """
     ).fetchall()
     print(f"Loaded {len(rows)} screenshots", file=sys.stderr)
 
@@ -67,15 +73,26 @@ def _match_source(conn, index, ocr_map, source_table, source_label):
     """
     if source_table == "twitter_likes":
         rows = conn.execute(
-            "SELECT tweet_id, full_text FROM twitter_likes "
-            "WHERE full_text NOT LIKE '%%{learnmore}%%' "
-            "  AND full_text NOT LIKE 'This Post is from%%' "
-            "  AND length(full_text) > 30"
+            """
+            SELECT
+                tweet_id,
+                full_text
+            FROM twitter_likes
+            WHERE full_text NOT LIKE '%{learnmore}%'
+              AND full_text NOT LIKE 'This Post is from%'
+              AND length(full_text) > 30
+            """
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT tweet_id, full_text FROM twitter_tweets "
-            "WHERE full_text IS NOT NULL AND length(full_text) > 30"
+            """
+            SELECT
+                tweet_id,
+                full_text
+            FROM twitter_tweets
+            WHERE full_text IS NOT NULL
+              AND length(full_text) > 30
+            """
         ).fetchall()
 
     matched_tweets = 0

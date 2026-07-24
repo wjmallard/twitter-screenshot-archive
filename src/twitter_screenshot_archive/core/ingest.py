@@ -9,18 +9,19 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytesseract
-from tqdm import tqdm
 from PIL import Image
 from pillow_heif import register_heif_opener
+from tqdm import tqdm
+
+from . import config
+from .cleaning import clean_ocr_text
+from .dates import extract_tweet_time, parse_tz_offset
+from .db import check_db, get_conn, images_in_db, upsert_screenshot
+from .minhash import compute_signature
+from .usernames import extract_usernames
 
 register_heif_opener()
 
-from . import config
-from .dates import parse_tz_offset, extract_tweet_time
-from .db import check_db, get_conn, images_in_db, upsert_screenshot
-from .minhash import compute_signature
-from .cleaning import clean_ocr_text
-from .usernames import extract_usernames
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".heic", ".tiff", ".bmp"}
 
 

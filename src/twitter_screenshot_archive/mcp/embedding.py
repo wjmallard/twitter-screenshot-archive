@@ -63,8 +63,13 @@ def backfill_embeddings():
     """Embed all rows that have ocr_text_clean but no embedding yet."""
     with get_conn() as conn:
         pending = conn.execute(
-            "SELECT count(*) FROM screenshots "
-            "WHERE ocr_text_clean IS NOT NULL AND ocr_text_clean != '' AND embedding IS NULL"
+            """
+            SELECT count(*)
+            FROM screenshots
+            WHERE ocr_text_clean IS NOT NULL
+              AND ocr_text_clean != ''
+              AND embedding IS NULL
+            """
         ).fetchone()["count"]
 
         if pending == 0:
@@ -74,9 +79,17 @@ def backfill_embeddings():
 
         while True:
             rows = conn.execute(
-                "SELECT id, ocr_text_clean FROM screenshots "
-                "WHERE ocr_text_clean IS NOT NULL AND ocr_text_clean != '' AND embedding IS NULL "
-                "ORDER BY id LIMIT %(limit)s",
+                """
+                SELECT
+                    id,
+                    ocr_text_clean
+                FROM screenshots
+                WHERE ocr_text_clean IS NOT NULL
+                  AND ocr_text_clean != ''
+                  AND embedding IS NULL
+                ORDER BY id
+                LIMIT %(limit)s
+                """,
                 {
                     "limit": BACKFILL_BATCH_SIZE,
                 },
