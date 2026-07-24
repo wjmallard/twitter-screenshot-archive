@@ -42,6 +42,16 @@ async def tweet_activity(
     if granularity not in _GRANULARITY_LABELS:
         return f"Error: granularity must be one of: {', '.join(sorted(_GRANULARITY_LABELS))}"
 
+    if keywords:
+        try:
+            with get_conn() as conn:
+                conn.execute(
+                    "SELECT to_tsquery('english', %(kw)s)",
+                    {"kw": keywords},
+                )
+        except Exception:
+            return f"Error: invalid keywords syntax: {keywords!r}"
+
     conditions = ["ocr_text_clean IS NOT NULL"]
     params: dict = {}
 
