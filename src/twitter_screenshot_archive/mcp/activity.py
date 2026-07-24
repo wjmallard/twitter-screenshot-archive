@@ -64,7 +64,10 @@ def tweet_activity(
         params["floor"] = min_score
 
     if keywords:
-        conditions.append("ocr_text_tsv @@ to_tsquery('english', %(keywords)s)")
+        conditions.append(
+            "(ocr_text_tsv @@ to_tsquery('english', %(keywords)s)"
+            " OR description_tsv @@ to_tsquery('english', %(keywords)s))"
+        )
         params["keywords"] = keywords
 
     add_time_filter(conditions, params, after, before)

@@ -87,7 +87,10 @@ def search_tweets(
     if keywords:
         if not validate_keywords(keywords):
             return f"Error: invalid keywords syntax: {keywords!r}"
-        conditions.append("ocr_text_tsv @@ to_tsquery('english', %(keywords)s)")
+        conditions.append(
+            "(ocr_text_tsv @@ to_tsquery('english', %(keywords)s)"
+            " OR description_tsv @@ to_tsquery('english', %(keywords)s))"
+        )
         params["keywords"] = keywords
 
     add_time_filter(conditions, params, after, before)
@@ -103,11 +106,17 @@ def search_tweets(
         else:
             order_by = "embedding <=> %(vec)s::vector"
     else:
-        select_extra = ", ts_rank(ocr_text_tsv, to_tsquery('english', %(keywords)s)) AS rank"
+        rank_expr = (
+            "GREATEST("
+            "ts_rank(ocr_text_tsv, to_tsquery('english', %(keywords)s)) * 2, "
+            "ts_rank(description_tsv, to_tsquery('english', %(keywords)s))"
+            ")"
+        )
+        select_extra = f", {rank_expr} AS rank"
         if sort == "chronological":
             order_by = "COALESCE(tweet_time, created_at) DESC"
         else:
-            order_by = "ts_rank(ocr_text_tsv, to_tsquery('english', %(keywords)s)) DESC"
+            order_by = f"{rank_expr} DESC"
 
     with get_conn() as conn:
         rows = conn.execute(
