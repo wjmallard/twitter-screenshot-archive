@@ -155,7 +155,7 @@ def count_fulltext(conn, query):
 
 def count_trigram(conn, query):
     row = conn.execute(
-        "SELECT count(*) FROM screenshots WHERE %s <<% ocr_text",
+        "SELECT count(*) FROM screenshots WHERE %s <<%% ocr_text",
         (query,),
     ).fetchone()
     return row[0]
