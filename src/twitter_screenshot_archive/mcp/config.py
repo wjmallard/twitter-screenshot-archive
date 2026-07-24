@@ -27,7 +27,7 @@ TIME_WEIGHT = _raw.get("time_weight", 2.0)
 CLUSTER_MIN_SIZE = _raw.get("cluster_min_size", 3)
 CLUSTER_MIN_SAMPLES = _raw.get("cluster_min_samples", None)  # defaults to CLUSTER_MIN_SIZE
 TOPIC_SIM_THRESHOLD_PCT = _raw.get("topic_sim_threshold_pct", 0.30)
-COARSE_SIMILARITY_FLOOR = _raw.get("coarse_sim_floor", 0.15)  # SQL pre-filter: deliberately loose
+COARSE_SIMILARITY_FLOOR = _raw.get("coarse_similarity_floor", 0.15)  # SQL pre-filter: deliberately loose
 SUMMARIZE_SNIPPETS = _raw.get("summarize_snippets", 0)
 
 # Vision-language model (tsa-describe)
