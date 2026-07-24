@@ -1,10 +1,19 @@
 """MinHash signature computation for related-tweet search."""
 
+import pickle
+import sys
+import time
+from pathlib import Path
+
 import numpy as np
 from datasketch import MinHash, MinHashLSH
 
+from .db import get_conn, load_all_signatures, signature_fingerprint
+
 NUM_PERM = 128
 SHINGLE_K = 3
+
+_CACHE_FILE = Path.home() / ".cache" / "twitter-screenshot-archive" / "lsh_index.pkl"
 
 
 def _shingle(text: str) -> set[str]:
@@ -50,6 +59,46 @@ def build_lsh_index(rows):
         m = signature_to_minhash(row["minhash_signature"])
         minhashes[row["id"]] = m
         lsh.insert(str(row["id"]), m)
+    return lsh, minhashes
+
+
+def load_or_build_lsh_index():
+    """Load the LSH index from the pickle cache, rebuilding when stale.
+
+    Returns (lsh_index, {id: MinHash} dict). Progress goes to stderr.
+    """
+    with get_conn() as conn:
+        fingerprint = signature_fingerprint(conn)
+
+    if _CACHE_FILE.exists():
+        try:
+            with open(_CACHE_FILE, "rb") as f:
+                cached = pickle.load(f)
+            if cached["fingerprint"] == fingerprint:
+                print(f"LSH index loaded from cache ({fingerprint[0]} signatures).", file=sys.stderr)
+                return cached["lsh"], cached["minhashes"]
+            print("LSH cache stale, rebuilding...", file=sys.stderr)
+        except Exception:
+            print("LSH cache unreadable, rebuilding...", file=sys.stderr)
+
+    with get_conn() as conn:
+        sigs = load_all_signatures(conn)
+    t0 = time.monotonic()
+    print(f"Building LSH index from {len(sigs)} signatures...", file=sys.stderr)
+    lsh, minhashes = build_lsh_index(sigs)
+    print(f"LSH index ready ({time.monotonic() - t0:.1f}s).", file=sys.stderr)
+
+    _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(_CACHE_FILE, "wb") as f:
+        pickle.dump(
+            {
+                "fingerprint": fingerprint,
+                "lsh": lsh,
+                "minhashes": minhashes,
+            },
+            f,
+        )
+    print(f"LSH cache saved to {_CACHE_FILE}", file=sys.stderr)
     return lsh, minhashes
 
 

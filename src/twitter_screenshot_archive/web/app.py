@@ -3,8 +3,6 @@
 import argparse
 import mimetypes
 import os
-import pickle
-import time
 from io import BytesIO
 from pathlib import Path
 
@@ -18,10 +16,9 @@ from ..core import config
 from ..core.db import (
     get_conn, search_fulltext, search_trigram, search_exact,
     count_fulltext, count_trigram, count_exact, count_screenshots,
-    load_all_signatures, get_screenshots_by_ids, get_timeline_neighbors,
-    signature_fingerprint,
+    get_screenshots_by_ids, get_timeline_neighbors,
 )
-from ..core.minhash import build_lsh_index, query_related
+from ..core.minhash import load_or_build_lsh_index, query_related
 
 app = Flask(__name__)
 
@@ -32,47 +29,12 @@ _IMAGE_ROOT = config.SCREENSHOT_DIR.resolve()
 _lsh = None
 _minhashes = {}
 
-_CACHE_DIR = Path.home() / ".cache" / "twitter-screenshot-archive"
-_CACHE_FILE = _CACHE_DIR / "lsh_index.pkl"
-
 
 def _init_index():
-    """Build or load LSH index, using a pickle cache when possible."""
+    """Build or load the LSH index once."""
     global _lsh, _minhashes
-    if _lsh is not None:
-        return
-
-    with get_conn() as conn:
-        fingerprint = signature_fingerprint(conn)
-
-    # Try loading from cache
-    if _CACHE_FILE.exists():
-        try:
-            with open(_CACHE_FILE, "rb") as f:
-                cached = pickle.load(f)
-            if cached["fingerprint"] == fingerprint:
-                _lsh, _minhashes = cached["lsh"], cached["minhashes"]
-                print(f"LSH index loaded from cache ({fingerprint[0]} signatures).")
-                return
-            else:
-                print("LSH cache stale, rebuilding...")
-        except Exception:
-            print("LSH cache unreadable, rebuilding...")
-
-    # Build from scratch
-    with get_conn() as conn:
-        sigs = load_all_signatures(conn)
-    t0 = time.monotonic()
-    print(f"Building LSH index from {len(sigs)} signatures...")
-    _lsh, _minhashes = build_lsh_index(sigs)
-    elapsed = time.monotonic() - t0
-    print(f"LSH index ready ({elapsed:.1f}s).")
-
-    # Save cache
-    _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(_CACHE_FILE, "wb") as f:
-        pickle.dump({"fingerprint": fingerprint, "lsh": _lsh, "minhashes": _minhashes}, f)
-    print(f"LSH cache saved to {_CACHE_FILE}")
+    if _lsh is None:
+        _lsh, _minhashes = load_or_build_lsh_index()
 
 
 def _format_size(size_bytes):
