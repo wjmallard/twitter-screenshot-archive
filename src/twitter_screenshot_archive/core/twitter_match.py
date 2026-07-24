@@ -13,6 +13,12 @@ from .db import check_db, get_conn
 SCORE_THRESHOLD = 80
 TOP_CANDIDATES = 20
 
+# Guards for adopting a matched tweet's timestamp as tweet_time.
+# Below score 95 the match is often a different instance of the same
+# text (copypasta, retweets) with a wildly different snowflake time.
+MATCH_TIME_MIN_SCORE = 95
+MATCH_TIME_AGREE_SECS = 3 * 86400
+
 _TCO_RE = re.compile(r"https?://t\.co/\S+")
 
 
@@ -153,6 +159,47 @@ def _match_source(conn, index, ocr_map, source_table, source_label):
     return matched_tweets, len(rows), total_links
 
 
+def _apply_matched_times(conn):
+    """Set tweet_time from the best-scoring matched tweet's exact timestamp.
+
+    Snowflake-derived times replace OCR-guessed ones: rows with no
+    tweet_time are filled and 'relative' estimates are upgraded, but
+    OCR-read 'absolute' times are kept. Three guards reject bad matches:
+    a high fuzzy score, the tweet cannot postdate its screenshot, and an
+    existing relative estimate must roughly agree.
+    """
+    result = conn.execute(
+        """
+        WITH best AS (
+            SELECT DISTINCT ON (m.screenshot_id)
+                m.screenshot_id,
+                m.score,
+                COALESCE(t.created_at, l.snowflake_date) AS matched_time
+            FROM screenshot_tweet_matches m
+            LEFT JOIN twitter_tweets t ON t.tweet_id = m.tweet_id
+            LEFT JOIN twitter_likes l ON l.tweet_id = m.tweet_id
+            WHERE COALESCE(t.created_at, l.snowflake_date) IS NOT NULL
+            ORDER BY m.screenshot_id, m.score DESC, COALESCE(t.created_at, l.snowflake_date) DESC
+        )
+        UPDATE screenshots s
+        SET tweet_time = b.matched_time,
+            tweet_time_source = 'matched'
+        FROM best b
+        WHERE s.id = b.screenshot_id
+          AND b.score >= %(min_score)s
+          AND s.tweet_time_source IS DISTINCT FROM 'absolute'
+          AND (s.created_at IS NULL OR b.matched_time <= s.created_at + interval '2 days')
+          AND (s.tweet_time_source IS DISTINCT FROM 'relative'
+               OR abs(extract(epoch FROM (s.tweet_time - b.matched_time))) <= %(agree_secs)s)
+        """,
+        {
+            "min_score": MATCH_TIME_MIN_SCORE,
+            "agree_secs": MATCH_TIME_AGREE_SECS,
+        },
+    )
+    return result.rowcount
+
+
 def main():
     check_db()
 
@@ -167,5 +214,8 @@ def main():
             conn, index, ocr_map, "twitter_tweets", "Tweets"
         )
 
+        times_set = _apply_matched_times(conn)
+
     print(f"\nLikes:  {likes_matched}/{likes_total} matched ({likes_links} links)", file=sys.stderr)
     print(f"Tweets: {tweets_matched}/{tweets_total} matched ({tweets_links} links)", file=sys.stderr)
+    print(f"Tweet times set from matches: {times_set}", file=sys.stderr)
