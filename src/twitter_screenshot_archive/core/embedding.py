@@ -1,13 +1,19 @@
-"""In-process MLX embedding engine and startup backfill."""
+"""In-process MLX embedding engine and backfill.
+
+MLX is a heavy optional dependency (installed with the mcp extra), so it
+is imported lazily inside the functions — importing this module stays
+cheap for consumers that never embed.
+"""
 
 import sys
 
-import mlx.core as mx
-from mlx_lm import load as mlx_load
 from tqdm import tqdm
 
-from ..core.db import get_conn
-from .config import BACKFILL_BATCH_SIZE, EMBEDDING_MODEL_ID
+from .config import RAW
+from .db import get_conn
+
+EMBEDDING_MODEL_ID = RAW.get("embedding_model_id", "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ")
+BACKFILL_BATCH_SIZE = RAW.get("embedding_batch_size", 128)
 
 _model = None
 _tokenizer = None
@@ -16,10 +22,19 @@ _tokenizer = None
 def load_model():
     """Load the embedding model and tokenizer into module state."""
     global _model, _tokenizer
+    import mlx.core as mx
+    from mlx_lm import load as mlx_load
+
     print(f"Loading embedding model {EMBEDDING_MODEL_ID}...", file=sys.stderr)
     _model, _tokenizer = mlx_load(EMBEDDING_MODEL_ID)
     mx.eval(_model.parameters())
     print("Embedding model ready.", file=sys.stderr)
+
+
+def ensure_model():
+    """Load the model on first use."""
+    if _model is None:
+        load_model()
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
@@ -28,6 +43,8 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     Returns a list of float lists (one embedding per input text).
     Uses last-token pooling with L2 normalization (Qwen3-Embedding convention).
     """
+    import mlx.core as mx
+
     tokens = _tokenizer._tokenizer(
         texts,
         return_tensors="np",

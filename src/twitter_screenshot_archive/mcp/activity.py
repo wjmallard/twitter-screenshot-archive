@@ -1,8 +1,8 @@
 """tweet_activity tool — histogram of tweet counts over time."""
 
 from ..core.db import get_conn
+from ..core.embedding import embed_texts, vec_literal
 from .config import SEARCH_SIMILARITY_FLOOR
-from .embedding import embed_texts, vec_literal
 from .server import mcp
 from .utils import (
     add_time_filter,

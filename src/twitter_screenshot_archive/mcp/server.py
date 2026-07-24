@@ -9,8 +9,8 @@ from mcp.server.fastmcp import FastMCP
 
 from ..core.config import PROJECT_ROOT
 from ..core.db import check_db
+from ..core.embedding import load_model
 from ..core.minhash import load_or_build_lsh_index
-from .embedding import load_model
 
 _PROMPT_FILE = PROJECT_ROOT / "mcp_prompt.txt"
 

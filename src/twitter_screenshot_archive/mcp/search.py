@@ -1,12 +1,12 @@
 """search_tweets tool."""
 
 from ..core.db import get_conn
+from ..core.embedding import embed_texts, vec_literal
 from .config import (
     DEFAULT_SEARCH_LIMIT,
     SEARCH_SIMILARITY_FLOOR,
     SNIPPET_MAX_CHARS,
 )
-from .embedding import embed_texts, vec_literal
 from .server import mcp
 from .utils import (
     add_time_filter,

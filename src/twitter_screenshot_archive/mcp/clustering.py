@@ -7,6 +7,7 @@ from sklearn.cluster import HDBSCAN
 from sklearn.decomposition import PCA
 
 from ..core.db import get_conn
+from ..core.embedding import embed_texts, vec_literal
 from ..core.minhash import signature_to_minhash
 from .config import (
     CLUSTER_MIN_SAMPLES,
@@ -16,7 +17,6 @@ from .config import (
     TIME_WEIGHT,
     TOPIC_SIM_THRESHOLD_PCT,
 )
-from .embedding import embed_texts, vec_literal
 from .utils import (
     add_time_filter,
     add_users_filter,

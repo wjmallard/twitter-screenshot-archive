@@ -2,11 +2,7 @@
 
 from ..core.config import RAW as _raw
 
-EMBEDDING_MODEL_ID = _raw.get(
-    "embedding_model_id", "mlx-community/Qwen3-Embedding-0.6B-4bit-DWQ"
-)
 EMBEDDING_DIM = 1024
-BACKFILL_BATCH_SIZE = _raw.get("embedding_batch_size", 128)
 DEFAULT_SEARCH_LIMIT = _raw.get("embedding_search_limit", 10)
 SEARCH_SIMILARITY_FLOOR = _raw.get("search_similarity_floor", 0.4)
 SNIPPET_MAX_CHARS = _raw.get("snippet_max_chars_mcp", 500)

@@ -8,7 +8,7 @@ from ..core.db import check_db
 def main():
     check_db()
     try:
-        from .embedding import backfill_embeddings, load_model
+        from ..core.embedding import backfill_embeddings, load_model
     except ImportError:
         print(
             "Error: MLX dependencies are not installed.\n"
